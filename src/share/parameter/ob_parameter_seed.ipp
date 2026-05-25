@@ -1236,9 +1236,9 @@ DEF_PARAM(sql_work_area, CAP, OB_CLUSTER_PARAMETER, "1G", "[10M,)",
 DEF_PARAM(__easy_memory_limit, CAP, OB_CLUSTER_PARAMETER, "4G", "[256M,)",
         "max memory size which can be used by libeasy. The default value is 4G. Range: [256M,)",
         ObParameterAttr(Section::OBSERVER, Source::DEFAULT, EditLevel::DYNAMIC_EFFECTIVE));
-DEF_PARAM(stack_size, CAP, OB_CLUSTER_PARAMETER, "512K", "[512K, 20M]",
+DEF_PARAM(stack_size, CAP, OB_CLUSTER_PARAMETER, "256K", "[256K, 20M]",
         "the size of routine execution stack"
-        "Range: [512K, 20M]",
+        "Range: [256K, 20M]",
         ObParameterAttr(Section::OBSERVER, Source::DEFAULT, EditLevel::STATIC_EFFECTIVE));
 DEF_PARAM(__easy_memory_reserved_percentage, INT, OB_CLUSTER_PARAMETER, "0", "[0,100]",
         "the percentage of easy memory reserved size. The default value is 0. Range: [0,100]",

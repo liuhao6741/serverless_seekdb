@@ -610,7 +610,7 @@ int ObSQLUtils::se_calc_const_expr(ObSQLSessionInfo *session,
       if (session->get_ddl_info().is_ddl_check_default_value()) {
         effective_tenant_id = OB_SERVER_TENANT_ID;
       }
-      SMART_VARS_2((ObExecContext, exec_ctx, tmp_allocator),
+      HEAP_VARS_2((ObExecContext, exec_ctx, tmp_allocator),
                    (ObStaticEngineExprCG, expr_cg, tmp_allocator,
                     session, schema_guard,
                     phy_plan_ctx->get_original_param_cnt(),

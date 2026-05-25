@@ -21,6 +21,8 @@
 #endif
 #include "lib/alloc/malloc_hook.h"
 #include "lib/utility/ob_sort.h"
+#include "common/ob_smart_call.h"
+
 using namespace oceanbase::lib;
 
 namespace oceanbase
@@ -55,7 +57,9 @@ const char *print_server_role(const ObServerRole server_role)
   return role_string;
 }
 
-static int64_t reserved_stack_size = 32L << 10;
+constexpr static int64_t reserved_stack_size = 32L << 10;
+STATIC_ASSERT(reserved_stack_size < STACK_RESERVED_SIZE,
+    "default reserved stack size should be less than stack size reserved in smart call");
 
 int64_t get_reserved_stack_size()
 {
@@ -97,7 +101,7 @@ int check_stack_overflow(bool &is_overflow,
       if (OB_UNLIKELY(cur_stack_used > (static_cast<int64_t>(stack_size) - reserved_size))) {
         is_overflow = true;
         COMMON_LOG(WARN, "stack possible overflow", KP(cur_stack), KP(stack_eof),
-            KP(stack_start), K(stack_size), K(reserved_size), K(cur_stack_used));
+            KP(stack_start), K(stack_size), K(reserved_size), K(cur_stack_used), KCSTRING(lbt()));
       }
     }
   }

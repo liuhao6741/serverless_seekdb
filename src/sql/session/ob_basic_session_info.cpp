@@ -18,6 +18,7 @@
 
 
 #include "ob_basic_session_info.h"
+#include "common/ob_smart_call.h"
 #include "sql/plan_cache/ob_prepare_stmt_struct.h"
 #include "observer/omt/ob_tenant_timezone_mgr.h"
 #include "share/system_variable/ob_nls_system_variable.h"
@@ -1216,7 +1217,7 @@ int ObBasicSessionInfo::load_default_sys_variable(const bool print_info_log, con
   int ret = OB_SUCCESS;
   if (OB_FAIL(sys_var_fac_.create_all_sys_vars())) {
     LOG_WARN("fail create all sys variables", K(ret));
-  } else if (OB_FAIL(init_system_variables(print_info_log, is_sys_tenant, is_deserialized))) {
+  } else if (OB_FAIL(SMART_CALL(init_system_variables(print_info_log, is_sys_tenant, is_deserialized)))) {
     LOG_WARN("Init system variables failed !", K(ret));
   }
   release_to_pool_ = OB_SUCC(ret);

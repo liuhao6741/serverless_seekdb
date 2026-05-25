@@ -6077,6 +6077,7 @@ public:
   void destroy();
   int create_sys_var(ObSysVarClassType sys_var_id, ObBasicSysVar *&sys_var, int64_t store_idx = -1);
   int create_all_sys_vars();
+  int create_all_sys_vars_();
   int free_sys_var(ObBasicSysVar *sys_var, int64_t sys_var_idx);
   static int create_sys_var(ObIAllocator &allocator_, ObSysVarClassType sys_var_id, ObBasicSysVar *&sys_var_ptr);
   static int calc_sys_var_store_idx(ObSysVarClassType sys_var_id, int64_t &store_idx);

@@ -34,6 +34,7 @@
 #include "sql/plan_cache/ob_values_table_compression.h"
 #include "pl/ob_pl_resolver.h"
 #include "sql/ob_sql_ccl_rule_manager.h"
+#include "common/ob_smart_call.h"
 
 namespace oceanbase
 {
@@ -1508,7 +1509,9 @@ int ObSql::handle_sql_execute(const ObString &sql,
       if (mode == PC_PS_MODE || mode == PC_PL_MODE) {
         pctx->get_param_store_for_update().reset();
       }
-      if (OB_FAIL(handle_physical_plan(sql, context, result, pc_ctx, get_plan_err))) {
+      // Use SMART_CALL_LARGE for complex SQL plan generation when plan cache misses
+      // This prevents frequent stack extending during physical plan generation
+      if (OB_FAIL(SMART_CALL_LARGE(handle_physical_plan(sql, context, result, pc_ctx, get_plan_err)))) {
         if (OB_ERR_PROXY_REROUTE == ret) {
           LOG_DEBUG("fail to handle physical plan", K(ret));
         } else {
@@ -2246,7 +2249,8 @@ int ObSql::handle_ps_execute(const ObPsStmtId client_stmt_id,
           } else if (!result.get_is_from_plan_cache()) {
             pctx->set_original_param_cnt(origin_params_count);
             pctx->get_param_store_for_update().reset();
-            if (OB_FAIL(handle_physical_plan(sql, context, result, pc_ctx, get_plan_err))) {
+            // Use SMART_CALL_LARGE for complex SQL plan generation when plan cache misses
+            if (OB_FAIL(SMART_CALL_LARGE(handle_physical_plan(sql, context, result, pc_ctx, get_plan_err)))) {
               if (OB_ERR_PROXY_REROUTE == ret) {
                 LOG_DEBUG("fail to handle physical plan", K(ret));
               } else {
@@ -2447,7 +2451,8 @@ int ObSql::handle_remote_query(const ObRemoteSqlInfo &remote_sql_info,
       }
       PlanCacheMode mode = remote_sql_info.use_ps_ ? PC_PS_MODE : PC_TEXT_MODE;
       mode = remote_sql_info.sql_from_pl_ ? PC_PL_MODE : mode;
-      if (OB_FAIL(handle_physical_plan(trimed_stmt, context, tmp_result, *pc_ctx, get_plan_err))) {
+      // Use SMART_CALL_LARGE for remote query plan generation
+      if (OB_FAIL(SMART_CALL_LARGE(handle_physical_plan(trimed_stmt, context, tmp_result, *pc_ctx, get_plan_err)))) {
         if (OB_ERR_PROXY_REROUTE == ret) {
           LOG_DEBUG("fail to handle physical plan", K(ret));
         } else {
@@ -2504,8 +2509,6 @@ OB_INLINE int ObSql::handle_text_query(const ObString &stmt, ObSqlCtx &context, 
   //trim the sql first, let 'select c1 from t' and '  select c1 from t' and hit the same plan_cache
   ObString trimed_stmt = const_cast<ObString &>(stmt).trim();
   context.is_prepare_protocol_ = false;
-  char buf[4096];
-  STATIC_ASSERT(sizeof(ObPlanCacheCtx) < sizeof(buf), "ObPlanCacheCtx is too large");
   if (OB_FAIL(init_result_set(context, result))) {
     LOG_WARN("failed to init result set", K(ret));
   } else if (trimed_stmt.empty()) {
@@ -2542,13 +2545,13 @@ OB_INLINE int ObSql::handle_text_query(const ObString &stmt, ObSqlCtx &context, 
 
   if (OB_FAIL(ret)) {
     // do nothing
-  //} else if (NULL == (pc_ctx = static_cast<ObPlanCacheCtx *>
-  //                             (allocator.alloc(sizeof(ObPlanCacheCtx))))) {
-  //  ret = OB_ALLOCATE_MEMORY_FAILED;
-  //  LOG_WARN("fail to alloc memory", K(ret), K(sizeof(ObPlanCacheCtx)));
+  } else if (NULL == (pc_ctx = static_cast<ObPlanCacheCtx *>
+                               (allocator.alloc(sizeof(ObPlanCacheCtx))))) {
+    ret = OB_ALLOCATE_MEMORY_FAILED;
+    LOG_WARN("fail to alloc memory", K(ret), K(sizeof(ObPlanCacheCtx)));
   } else {
     context.cur_sql_ = trimed_stmt;
-    pc_ctx = new (buf) ObPlanCacheCtx(trimed_stmt,
+    pc_ctx = new (pc_ctx) ObPlanCacheCtx(trimed_stmt,
                                          PC_TEXT_MODE,
                                          allocator,
                                          context,
@@ -2598,7 +2601,7 @@ OB_INLINE int ObSql::handle_text_query(const ObString &stmt, ObSqlCtx &context, 
     //do nothing
   }
   if (OB_SUCC(ret) && !result.get_is_from_plan_cache()) { // did not get plan from plan cache, take the long path to generate plan
-    if (OB_FAIL(handle_physical_plan(trimed_stmt, context, result, *pc_ctx, get_plan_err))) {
+    if (OB_FAIL(SMART_CALL_LARGE(handle_physical_plan(trimed_stmt, context, result, *pc_ctx, get_plan_err)))) {
       if (OB_ERR_PROXY_REROUTE == ret) {
         LOG_DEBUG("fail to handle physical plan", K(ret));
       } else {
@@ -2815,7 +2818,7 @@ int ObSql::generate_stmt(ParseResult &parse_result,
         LOG_DEBUG("question mark size is ", K(parse_result.question_mark_ctx_.count_));
       }
 
-      ObResolver resolver(resolver_ctx);
+      HEAP_VAR(ObResolver, resolver, resolver_ctx) {
       NG_TRACE(resolve_begin);
       if (OB_FAIL(plan_ctx->build_subschema_ctx_by_param_store(context.schema_guard_))) {
         // only when param has sql udt types
@@ -2971,6 +2974,7 @@ int ObSql::generate_stmt(ParseResult &parse_result,
           SQL_LOG(WARN, "failed to generate stmt", K(ret));
         }
       }
+      } // end HEAP_VAR(ObResolver)
   }
   resolver_mem_usage = allocator.total() - last_mem_usage;
   LOG_DEBUG("SQL MEM USAGE", K(resolver_mem_usage), K(last_mem_usage));
@@ -3140,7 +3144,7 @@ int ObSql::generate_plan(ParseResult &parse_result,
     stmt->get_query_ctx()->root_stmt_ = stmt;
     const ObGlobalHint &global_hint = stmt->get_query_ctx()->get_global_hint();
     sql_ctx.session_info_->set_early_lock_release(global_hint.enable_lock_early_release_);
-    ObOptimizerContext optctx(sql_ctx.session_info_,
+    HEAP_VAR(ObOptimizerContext, optctx, sql_ctx.session_info_,
                               &result.get_exec_context(),
                               &result.get_exec_context().get_stmt_factory()->get_query_ctx()->sql_schema_guard_,
                               opt_stat_mgr_,
@@ -3152,7 +3156,7 @@ int ObSql::generate_plan(ParseResult &parse_result,
                               *result.get_exec_context().get_expr_factory(),
                               stmt,
                               result.is_ps_protocol(),
-                              result.get_exec_context().get_stmt_factory()->get_query_ctx());
+                              result.get_exec_context().get_stmt_factory()->get_query_ctx()) {
     optctx.set_aggregation_optimization_settings(aggregate_setting);
     pctx->set_field_array(result.get_field_columns());
     pctx->set_is_ps_protocol(result.is_ps_protocol());
@@ -3327,6 +3331,7 @@ int ObSql::generate_plan(ParseResult &parse_result,
     } else {
       result.get_exec_context().reference_my_plan(phy_plan);
     }
+    } // end HEAP_VAR optctx
   }
   return ret;
 }
@@ -4953,8 +4958,8 @@ int ObSql::handle_parser(const ObString &sql,
   if (OB_ISNULL(pc_ctx.sql_ctx_.session_info_) || OB_ISNULL(pctx)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("invalid argument", K(ret), KP(pctx), KP(pc_ctx.sql_ctx_.session_info_));
-  } else if (OB_FAIL(parser_and_check(sql, exec_ctx, pc_ctx, parse_result,
-                                      get_plan_err, add_plan_to_pc, is_enable_transform_tree))) {
+  } else if (OB_FAIL(SMART_CALL(parser_and_check(sql, exec_ctx, pc_ctx, parse_result,
+                                      get_plan_err, add_plan_to_pc, is_enable_transform_tree)))) {
     LOG_WARN("fail to parser normal query",
              "sql", pc_ctx.sql_ctx_.is_sensitive_ ? ObString(OB_MASKED_STR) : sql, K(ret));
   }

@@ -28,6 +28,7 @@
 #include "observer/ob_server_struct.h"
 #include "rootserver/ob_ddl_service_launcher.h"   // for ObDDLServiceLauncher
 #include "rootserver/ddl_task/ob_ddl_scheduler.h" // for ObDDLScheduler
+#include "common/ob_smart_call.h"
 
 namespace oceanbase
 {
@@ -421,7 +422,7 @@ protected:
       : ObRootServerRPCProcessor<pcode>(rs, check_type, is_ddl_like, arg) {}                  \
   protected:                                                                                  \
     virtual int leader_process() {                   \
-      return root_service_.stmt; }                   \
+      return SMART_CALL(root_service_.stmt); }       \
   };
 
 // RPC need rs in full service status (RS restart task success)

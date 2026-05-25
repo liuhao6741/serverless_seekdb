@@ -1148,11 +1148,11 @@ int ObTenant::acquire_more_worker(int64_t num, int64_t &succ_num, bool force)
     ObThWorker *w = nullptr;
     if (OB_FAIL(create_worker(w, this))) {
       LOG_WARN("create worker failed", K(ret));
-    } else if (!workers_.add_last(&w->worker_node_)) {
-      OB_ASSERT(false);
-      ret = OB_ERR_UNEXPECTED;
-      LOG_ERROR("add worker to list fail", K(ret));
     } else {
+      lib::ObMutexGuard g(workers_lock_);
+      if (!workers_.add_last(&w->worker_node_)) {
+        ob_abort();
+      }
       succ_num++;
     }
   }

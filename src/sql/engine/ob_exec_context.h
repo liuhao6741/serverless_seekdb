@@ -307,9 +307,9 @@ public:
   inline ObSQLSessionMgr *get_session_mgr() const;
 
   /**
-   * @brief get execution stat from all tasks
+   * @brief get execution stat collector on demand
    */
-  ObExecStatCollector &get_exec_stat_collector();
+  int get_exec_stat_collector(ObExecStatCollector *&collector);
 
   /**
    * @brief set admission version
@@ -324,7 +324,7 @@ public:
   /**
    * @brief get admission addr set
    */
-  hash::ObHashMap<ObAddr, int64_t> &get_admission_addr_map();
+  int get_admission_addr_map(hash::ObHashMap<ObAddr, int64_t> *&addr_map);
 
   /**
    * @brief get allocator.
@@ -609,6 +609,7 @@ public:
 private:
   int build_temp_expr_ctx(const ObTempExpr &temp_expr, ObTempExprCtx *&temp_expr_ctx);
   int check_extra_status();
+  void release_admission_addr_map();
   void set_pl_stack_ctx(pl::ObPLContext *pl_stack_ctx) { pl_stack_ctx_ = pl_stack_ctx; }
   //set the parent execute context in nested sql
   void set_parent_ctx(ObExecContext *parent_ctx) { parent_ctx_ = parent_ctx; }
@@ -658,8 +659,7 @@ protected:
   ObExprOperatorCtx **expr_op_ctx_store_;
   ObTaskExecutorCtx task_executor_ctx_;
   ObSQLSessionInfo *my_session_;
-  common::ObMySQLProxy *sql_proxy_;
-  ObExecStatCollector exec_stat_collector_;
+  ObExecStatCollector *exec_stat_collector_;
   ObStmtFactory *stmt_factory_;
   ObRawExprFactory *expr_factory_;
   const share::schema::ObOutlineParamsWrapper *outline_params_wrapper_;
@@ -732,7 +732,6 @@ protected:
   // just for convert charset in query response result
   lib::MemoryContext convert_allocator_;
   lib::MemoryContext mem_context_;
-  PWJTabletIdMap* pwj_map_;
   GroupPWJTabletIdMap *group_pwj_map_;
   // sample result
   Ob2DArray<ObPxTabletRange> part_ranges_;
@@ -743,7 +742,7 @@ protected:
   int64_t px_batch_id_;
 
   uint64_t admission_version_;
-  hash::ObHashMap<ObAddr, int64_t> admission_addr_map_;
+  hash::ObHashMap<ObAddr, int64_t> *admission_addr_map_;
   // used for temp expr ctx manager
   bool use_temp_expr_ctx_cache_;
   hash::ObHashMap<int64_t, int64_t> temp_expr_ctx_map_;
@@ -883,11 +882,6 @@ inline ObSQLSessionMgr *ObExecContext::get_session_mgr() const
   return GCTX.session_mgr_;
 }
 
-inline ObExecStatCollector &ObExecContext::get_exec_stat_collector()
-{
-  return exec_stat_collector_;
-}
-
 inline void ObExecContext::set_admission_version(uint64_t admission_version)
 {
   admission_version_ = admission_version;
@@ -898,9 +892,18 @@ inline uint64_t ObExecContext::get_admission_version() const
   return admission_version_;
 }
 
-inline hash::ObHashMap<ObAddr, int64_t> &ObExecContext::get_admission_addr_map()
+inline int ObExecContext::get_admission_addr_map(hash::ObHashMap<ObAddr, int64_t> *&addr_map)
 {
-  return admission_addr_map_;
+  int ret = OB_SUCCESS;
+  typedef hash::ObHashMap<ObAddr, int64_t> AdmissionAddrMap;
+  if (OB_ISNULL(admission_addr_map_)) {
+    void *buf = ob_malloc(sizeof(AdmissionAddrMap), ObMemAttr(OB_SYS_TENANT_ID, "PxAdmAddrMap"));
+    if (OB_NOT_NULL(buf)) {
+      admission_addr_map_ = new (buf) AdmissionAddrMap();
+    }
+  }
+  addr_map = admission_addr_map_;
+  return ret;
 }
 
 struct ObTempExprCtxReplaceGuard

@@ -16,6 +16,7 @@
 
 #define USING_LOG_PREFIX SQL_REWRITE
 #include "ob_transform_rule.h"
+#include "common/ob_smart_call.h"
 #include "sql/optimizer/ob_optimizer.h"
 #include "sql/optimizer/ob_optimizer_context.h"
 #include "sql/rewrite/ob_transformer_impl.h"
@@ -157,7 +158,7 @@ int ObTransformRule::transform(ObDMLStmt *&stmt,
   if (OB_ISNULL(stmt)) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret));
-  } else if (OB_FAIL(transform_stmt_recursively(parent_stmts, 0, stmt))) {
+  } else if (OB_FAIL(SMART_CALL(transform_stmt_recursively(parent_stmts, 0, stmt)))) {
     LOG_WARN("failed to transform stmt recursively", K(ret));
   } else if (OB_FAIL(adjust_transform_types(transform_types))) {
     LOG_WARN("failed to adjust transform types", K(ret));

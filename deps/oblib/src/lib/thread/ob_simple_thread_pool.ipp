@@ -151,6 +151,10 @@ bool ObSimpleThreadPoolBase<T>::do_add_worker()
       OB_DELETE(Worker, "QThWker", w);
       return false;
     }
+    // Prevent reap_workers() from deleting this worker before start():
+    // the Threads constructor sets stop_=true, but this worker is not
+    // actually stopping — it just hasn't started yet.
+    w->has_set_stop() = false;
     if (!workers_.add_last(&w->worker_node_)) {
       OB_DELETE(Worker, "QThWker", w);
       return false;

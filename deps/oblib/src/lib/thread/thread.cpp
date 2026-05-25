@@ -364,13 +364,15 @@ void Thread::destroy_stack()
 {
 #ifdef _WIN32
   pth_ = pthread_null();
-#elif !defined(OB_USE_ASAN)
+#else
+#if !defined(OB_USE_ASAN)
   if (stack_addr_ != nullptr) {
     g_stack_allocer.dealloc(stack_addr_);
     stack_addr_ = nullptr;
   }
 #endif
   pth_ = 0;
+#endif
 }
 
 void* Thread::__th_start(void *arg)

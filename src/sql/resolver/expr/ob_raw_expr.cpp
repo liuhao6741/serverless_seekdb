@@ -428,7 +428,11 @@ int ObRawExpr::formalize(const ObSQLSessionInfo *session_info,
                          bool need_deduce_type)
 {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(formalize(session_info, solidify_session_vars, NULL, OB_INVALID_INDEX_INT64, need_deduce_type))) {
+  if (OB_FAIL(SMART_CALL(formalize(session_info,
+                                   solidify_session_vars,
+                                   NULL,
+                                   OB_INVALID_INDEX_INT64,
+                                   need_deduce_type)))) {
     LOG_WARN("formalize with local vars failed", K(ret));
   }
   return ret;

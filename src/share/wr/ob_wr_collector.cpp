@@ -318,7 +318,7 @@ int ObWrCollector::collect_ash()
         part_locations))) {
       LOG_WARN("fail to get virtual table location", KR(ret), K(OB_ALL_VIRTUAL_ASH_TID));
   } else {
-    SMART_VAR(ObISQLClient::ReadResult, res)
+    HEAP_VAR(ObISQLClient::ReadResult, res)
     {
       // iterate every partition
       for (int64_t i = 0; OB_SUCC(ret) && i < part_locations.count(); i++) {
@@ -823,7 +823,7 @@ int ObWrCollector::collect_sqlstat()
   int64_t topnsql = -1;
   {
     // read wr control`s top N SQL
-    SMART_VAR(ObISQLClient::ReadResult, res)
+    HEAP_VAR(ObISQLClient::ReadResult, res)
     {
       ObMySQLResult *result = nullptr;
       int64_t query_timeout = timeout_ts_ - common::ObTimeUtility::current_time();
@@ -857,7 +857,7 @@ int ObWrCollector::collect_sqlstat()
   }
 
   if (OB_SUCC(ret) && topnsql != -1) {
-    SMART_VAR(ObISQLClient::ReadResult, res)
+    HEAP_VAR(ObISQLClient::ReadResult, res)
     {
       ObMySQLResult *result = nullptr;
       int64_t query_timeout = timeout_ts_ - common::ObTimeUtility::current_time();

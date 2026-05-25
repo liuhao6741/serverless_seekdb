@@ -16,6 +16,7 @@
 
 #define USING_LOG_PREFIX SQL_SESSION
 #include "share/system_variable/ob_system_variable_factory.h"
+#include "common/ob_smart_call.h"
 using namespace oceanbase::common;
 
 namespace oceanbase
@@ -3279,6 +3280,11 @@ int ObSysVarFactory::free_sys_var(ObBasicSysVar *sys_var, int64_t sys_var_idx)
 }
 
 int ObSysVarFactory::create_all_sys_vars()
+{
+  return SMART_CALL(create_all_sys_vars_());
+}
+
+int ObSysVarFactory::create_all_sys_vars_()
 {
   int ret = OB_SUCCESS;
   if (OB_FAIL(try_init_store_mem())) {

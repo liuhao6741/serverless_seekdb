@@ -123,22 +123,6 @@ public:
     delegate_->deregisterEHFrames();
   }
 
-#if defined(__aarch64__)
-  void reserveAllocationSpace(uintptr_t CodeSize, uint32_t CodeAlign,
-                              uintptr_t RODataSize, uint32_t RODataAlign,
-                              uintptr_t RWDataSize, uint32_t RWDataAlign) override
-  {
-    delegate_->reserveAllocationSpace(CodeSize, CodeAlign,
-                                      RODataSize, RODataAlign,
-                                      RWDataSize, RWDataAlign);
-  }
-
-  bool needsToReserveAllocationSpace() override
-  {
-    return delegate_->needsToReserveAllocationSpace();
-  }
-#endif
-
 private:
   // Diagnostic: MAGIC_ALIVE while constructed, MAGIC_DEAD after ~Shim().
   // Placed first so its offset is stable; checked at every virtual entry.

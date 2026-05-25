@@ -16,6 +16,7 @@
 
 #define USING_LOG_PREFIX SQL_RESV
 #include "sql/resolver/ob_resolver.h"
+#include "common/ob_smart_call.h"
 #include "sql/resolver/cmd/ob_alter_system_resolver.h"
 #include "sql/resolver/cmd/ob_switch_role_resolver.h"
 #include "sql/resolver/dml/ob_insert_resolver.h"
@@ -157,7 +158,7 @@ int ObResolver::stmt_resolver_func(ObResolverParams &params, const ParseNode &pa
 {
   int ret = OB_SUCCESS;
   HEAP_VAR(ResolverType, stmt_resolver, params) {
-    if (OB_FAIL(stmt_resolver.resolve(parse_tree))) {
+    if (OB_FAIL(SMART_CALL(stmt_resolver.resolve(parse_tree)))) {
       LOG_WARN("execute stmt_resolver failed", K(ret), K(parse_tree.type_));
     }
     stmt = stmt_resolver.get_basic_stmt();
@@ -172,7 +173,7 @@ int ObResolver::select_stmt_resolver_func(ObResolverParams &params, const ParseN
   HEAP_VAR(SelectResolverType, stmt_resolver, params) {
     stmt_resolver.set_calc_found_rows(true);
     stmt_resolver.set_has_top_limit(true);
-    if (OB_FAIL(stmt_resolver.resolve(parse_tree))) {
+    if (OB_FAIL(SMART_CALL(stmt_resolver.resolve(parse_tree)))) {
       LOG_WARN("execute stmt_resolver failed", K(ret), K(parse_tree.type_));
     }
     stmt = stmt_resolver.get_basic_stmt();

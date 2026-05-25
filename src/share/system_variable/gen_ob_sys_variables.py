@@ -504,6 +504,7 @@ public:
   void destroy();
   int create_sys_var(ObSysVarClassType sys_var_id, ObBasicSysVar *&sys_var, int64_t store_idx = -1);
   int create_all_sys_vars();
+  int create_all_sys_vars_();
   int free_sys_var(ObBasicSysVar *sys_var, int64_t sys_var_idx);
   static int create_sys_var(ObIAllocator &allocator_, ObSysVarClassType sys_var_id, ObBasicSysVar *&sys_var_ptr);
   static int calc_sys_var_store_idx(ObSysVarClassType sys_var_id, int64_t &store_idx);
@@ -679,6 +680,7 @@ def make_sys_var_cpp(pdir, filename, list_sorted_by_name, list_sorted_by_id):
   wfile.write(file_head_annotation);
   wfile.write("#define USING_LOG_PREFIX SQL_SESSION\n");
   wfile.write("#include \"" + pdir + "/" + filename.replace(".cpp", ".h") + "\"\n")
+  wfile.write("#include \"common/ob_smart_call.h\"\n")
   # wfile.write("#include \"share/system_variable/ob_system_variable_init.cpp\"\n")
   wfile.write("using namespace oceanbase::common;\n");
   wfile.write("""
@@ -932,6 +934,11 @@ int ObSysVarFactory::free_sys_var(ObBasicSysVar *sys_var, int64_t sys_var_idx)
 }
 
 int ObSysVarFactory::create_all_sys_vars()
+{
+  return SMART_CALL(create_all_sys_vars_());
+}
+
+int ObSysVarFactory::create_all_sys_vars_()
 {
   int ret = OB_SUCCESS;
   if (OB_FAIL(try_init_store_mem())) {
