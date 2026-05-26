@@ -86,6 +86,8 @@ MySQL 兼容 · 嵌入式 / 服务器双模式 · 向量 + 全文混合搜索 ·
 pip install -U pyseekdb   # pyseekdb 是 seekdb 的 Python SDK
 ```
 
+> 📋 [查看 demo.py 源码 →](images/demo.py)
+
 无需服务器、无需定义 Schema、无需配置 Embedding。嵌入式模式直接在进程内运行；一行代码切换到服务器模式或 OceanBase 分布式模式。[更多示例 →](#更多示例)
 
 ---

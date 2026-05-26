@@ -86,6 +86,8 @@ MySQL-compatible · Embedded or Server · Hybrid Vector + Full-text Search · CO
 pip install -U pyseekdb   # pyseekdb is the Python SDK for seekdb
 ```
 
+> 📋 [View demo.py source →](images/demo.py)
+
 No servers, no schemas, no embedding setup. Embedded mode runs in-process; switch to server / OceanBase mode with one line. [More examples →](#more-examples)
 
 ---
