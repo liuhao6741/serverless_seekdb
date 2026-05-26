@@ -86,6 +86,8 @@ MySQL 互換 · 組み込み / サーバー両対応 · ベクトル + 全文ハ
 pip install -U pyseekdb   # pyseekdb は seekdb の Python SDK です
 ```
 
+> 📋 [demo.py ソースを見る →](images/demo.py)
+
 サーバー不要、スキーマ定義不要、エンベディング設定不要。組み込みモードならプロセス内でそのまま動作し、たった 1 行でサーバーモードや OceanBase 分散モードに切り替えられます。[その他の例 →](#その他の例)
 
 ---
