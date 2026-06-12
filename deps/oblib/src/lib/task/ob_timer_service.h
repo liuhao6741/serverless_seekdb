@@ -180,6 +180,7 @@ private:
 private:
   bool is_never_started_;
   bool is_stopped_;
+  bool is_destroyed_;
   uint64_t tenant_id_;
   obutil::ObMonitor<obutil::Mutex> monitor_;
   TokenAlloc token_alloc_;

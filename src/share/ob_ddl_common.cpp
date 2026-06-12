@@ -2968,7 +2968,8 @@ int ObDDLUtil::calc_snapshot_with_gts(
   return ret;
 }
 
-int ObDDLUtil::construct_domain_index_arg(const ObTableSchema *table_schema,
+int ObDDLUtil::construct_domain_index_arg(ObSchemaGetterGuard &schema_guard,
+    const ObTableSchema *table_schema,
     const ObTableSchema *&index_schema,
     rootserver::ObDDLTask &task,
     ObCreateIndexArg &create_index_arg,
@@ -2976,7 +2977,6 @@ int ObDDLUtil::construct_domain_index_arg(const ObTableSchema *table_schema,
 {
   int ret = OB_SUCCESS;
   rootserver::ObRootService *root_service = GCTX.root_service_;
-  ObSchemaGetterGuard new_schema_guard;
   if (OB_ISNULL(root_service)) {
     ret = OB_ERR_SYS;
     LOG_WARN("error sys, root service must not be nullptr", K(ret));
@@ -3006,13 +3006,11 @@ int ObDDLUtil::construct_domain_index_arg(const ObTableSchema *table_schema,
   create_index_arg.is_offline_rebuild_ = true;
   create_index_arg.parallelism_ = task.get_parallelism();
   if (OB_FAIL(ret)) {
-  } else if (OB_FAIL(root_service->get_ddl_service().get_tenant_schema_guard_with_version_in_inner_table(task.get_tenant_id(), new_schema_guard))) {
-    LOG_WARN("failed to refresh schema guard", K(ret));
   } else if (index_schema->is_vec_index_snapshot_data_type()) {
     ObString domain_index_name;
     if (OB_FAIL(ObPluginVectorIndexUtils::get_vector_index_prefix(*index_schema, domain_index_name))) {
       LOG_WARN("failed to get domain index name", K(ret), KP(index_schema));
-    } else if (OB_FAIL(new_schema_guard.get_table_schema(index_schema->get_tenant_id(), index_schema->get_database_id(), domain_index_name, true, index_schema, create_index_arg.is_offline_rebuild_, false))) {
+    } else if (OB_FAIL(schema_guard.get_table_schema(index_schema->get_tenant_id(), index_schema->get_database_id(), domain_index_name, true, index_schema, create_index_arg.is_offline_rebuild_, false))) {
       LOG_WARN("failed to get domain index schema", K(ret), K(domain_index_name));
     } else if (OB_ISNULL(index_schema)) {
       ret = OB_TABLE_NOT_EXIST;
@@ -3051,7 +3049,7 @@ int ObDDLUtil::construct_domain_index_arg(const ObTableSchema *table_schema,
   if (OB_FAIL(ret)) {
   } else if (OB_FAIL(index_schema->get_index_name(create_index_arg.index_name_))) {
     LOG_WARN("failed to get index name", K(ret), KP(index_schema));
-  } else if (OB_FAIL(new_schema_guard.get_database_schema(task.get_tenant_id(), table_schema->get_database_id(), database_schema)) || OB_ISNULL(database_schema)) {
+  } else if (OB_FAIL(schema_guard.get_database_schema(task.get_tenant_id(), table_schema->get_database_id(), database_schema)) || OB_ISNULL(database_schema)) {
     LOG_WARN("failed to get database schema", K(ret), KP(database_schema));
   } else {
     create_index_arg.table_name_ = ObString(table_schema->get_table_name_str());
@@ -4764,7 +4762,7 @@ int ObDDLUtil::check_table_empty(
         LOG_WARN("fail to generate new name with escape character",
                   K(ret), K(table_name));
       } else if (OB_FAIL(session_param.ddl_info_.init(ddl_info, table_schema.get_session_id()))) {
-        LOG_WARN("fail to init ddl info", KR(ret), K(ddl_info), K(table_schema.get_session_id()));
+        LOG_WARN("fail to init ddl info", KR(ret), K(ddl_info), K(table_schema.get_session_id())); 
       } else if (OB_FAIL(ObShareUtil::set_default_timeout_ctx(timeout_ctx, GCONF.internal_sql_execute_timeout))) {
         LOG_WARN("failed to set default timeout ctx", K(ret), K(timeout_ctx));
       } else if (OB_FAIL(connection->set_ddl_info(&session_param.ddl_info_))) {

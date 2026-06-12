@@ -301,7 +301,6 @@ void ObVectorClusterHelper::release_inner_session(sql::ObFreeSessionCtx &free_se
     session->set_session_sleep();
     GCTX.session_mgr_->revert_session(session);
     GCTX.session_mgr_->free_session(free_session_ctx);
-    GCTX.session_mgr_->mark_sessid_unused(free_session_ctx.sessid_);
     session = nullptr;
   }
 }

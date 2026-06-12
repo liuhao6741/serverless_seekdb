@@ -18,8 +18,7 @@
 #define OCEANBASE_ROOTSERVER_OB_SCHEMA_HISTORY_RECYCLER_H_
 
 #include "observer/ob_server_struct.h"
-#include "rootserver/ob_rs_reentrant_thread.h"
-#include "rootserver/ob_thread_idling.h"
+#include "lib/thread/thread_mgr_interface.h"
 //#include "rootserver/ob_freeze_info_manager.h"
 #include "share/schema/ob_multi_version_schema_service.h"
 #include "share/config/ob_server_config.h"
@@ -28,16 +27,6 @@ namespace oceanbase
 {
 namespace rootserver
 {
-class ObSchemaHistoryRecyclerIdling : public ObThreadIdling
-{
-public:
-  explicit ObSchemaHistoryRecyclerIdling(volatile bool &stop)
-    : ObThreadIdling(stop) {}
-  virtual int64_t get_idle_interval_us();
-public:
-  const static int64_t DEFAULT_SCHEMA_HISTORY_RECYCLE_INTERVAL = 60LL * 60 * 1000 * 1000; //1h
-};
-
 struct ObFirstSchemaKey
 {
 public:
@@ -155,7 +144,7 @@ public:
 };
 
 // Running in a single thread.
-class ObSchemaHistoryRecycler : public ObRsReentrantThread
+class ObSchemaHistoryRecycler : public common::ObTimerTask
 {
 public:
   ObSchemaHistoryRecycler();
@@ -164,18 +153,19 @@ public:
   int init(share::schema::ObMultiVersionSchemaService &schema_service,
            //ObFreezeInfoManager &freeze_info_manager,
            common::ObMySQLProxy &sql_proxy);
-  virtual void run3() override;
-  void wakeup();
+  virtual void runTimerTask() override;
+  int start();
   void stop();
-  virtual int blocking_run() { BLOCKING_RUN_IMPLEMENT(); }
+  void wait();
+  int destroy();
   int check_stop();
   int get_recycle_schema_versions(
       const obrpc::ObGetRecycleSchemaVersionsArg &arg,
       obrpc::ObGetRecycleSchemaVersionsResult &result);
 private:
   int check_inner_stat();
+  int64_t get_recycle_interval_us() const;
   bool is_valid_recycle_schema_version(const int64_t recycle_schema_version);
-  int idle();
   int try_recycle_schema_history();
   int try_recycle_schema_history(const common::ObIArray<uint64_t> &tenant_ids);
   int try_recycle_schema_history(
@@ -206,11 +196,12 @@ public:
   static const int64_t BUCKET_NUM = 10;
 private:
   bool inited_;
-  mutable ObSchemaHistoryRecyclerIdling idling_;
+  volatile bool stop_;
   share::schema::ObMultiVersionSchemaService *schema_service_;
   //ObFreezeInfoManager *freeze_info_mgr_;
   common::ObMySQLProxy *sql_proxy_;
   common::hash::ObHashMap<uint64_t, int64_t, common::hash::ReadWriteDefendMode> recycle_schema_versions_;
+  int64_t last_recycle_ts_;
   DISALLOW_COPY_AND_ASSIGN(ObSchemaHistoryRecycler);
 };
 

@@ -73,7 +73,6 @@ class ObPL;
 namespace storage
 {
 class ObPtfMgr;
-class ObLocalityManager;
 }
 
 namespace transaction
@@ -190,7 +189,6 @@ struct ObGlobalContext
   int64_t flashback_scn_;
   int64_t ssl_key_expired_time_;
   sql::ObConnectResourceMgr* conn_res_mgr_;
-  storage::ObLocalityManager *locality_manager_;
   obrpc::ObExtenralTableRpcProxy *external_table_proxy_;
   share::ObWorkloadRepositoryService *wr_service_;
   observer::ObStartupAccelTaskHandler* startup_accel_handler_;

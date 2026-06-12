@@ -1495,7 +1495,9 @@ public:
       schema::ObSchemaGetterGuard &schema_guard,
       const ObTableSchema &data_table_schema,
       int64_t &new_fetched_snapshot);
-  static int construct_domain_index_arg(const ObTableSchema *table_schema,
+  static int construct_domain_index_arg(
+    ObSchemaGetterGuard &schema_guard,
+    const ObTableSchema *table_schema,
     const ObTableSchema *&index_schema,
     rootserver::ObDDLTask &task,
     obrpc::ObCreateIndexArg &create_index_arg,

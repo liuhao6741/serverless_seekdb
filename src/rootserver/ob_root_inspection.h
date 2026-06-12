@@ -51,15 +51,13 @@ class ObRootService;
 
 ////////////////////////////////////////////////////////////////
 // Class I: purge recyclebin in the background
-class ObPurgeRecyclebinTask: public common::ObAsyncTimerTask
+class ObPurgeRecyclebinTask: public common::ObTimerTask
 {
 public:
   explicit ObPurgeRecyclebinTask(ObRootService &rs);
   virtual ~ObPurgeRecyclebinTask() {}
 
-  virtual int process() override;
-  virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-  virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
+  virtual void runTimerTask() override;
 private:
   ObRootService &root_service_;
 };

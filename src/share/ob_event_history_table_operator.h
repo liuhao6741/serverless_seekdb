@@ -49,20 +49,16 @@ namespace detector
 class ObDeadLockEventHistoryTableOperator;
 }
 class ObEventHistoryTableOperator;
-class ObEventTableClearTask : public common::ObAsyncTimerTask
+class ObEventTableClearTask : public common::ObTimerTask
 {
 public:
   ObEventTableClearTask(
     ObEventHistoryTableOperator &rs_event_operator,
     ObEventHistoryTableOperator &server_event_operator,
-    ObEventHistoryTableOperator &deadlock_history_operator,
-    common::ObWorkQueue &work_queue);
+    ObEventHistoryTableOperator &deadlock_history_operator);
   virtual ~ObEventTableClearTask() {}
 
-  // interface of AsyncTask
-  virtual int process() override;
-  virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-  virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
+  virtual void runTimerTask() override;
 private:
   ObEventHistoryTableOperator &rs_event_operator_;
   ObEventHistoryTableOperator &server_event_operator_;

@@ -31,7 +31,6 @@
 #include "restoreservice/ob_log_restore_service.h"
 #include "ob_net_keepalive_adapter.h"
 #include "ob_ls_adapter.h"
-#include "ob_locality_adapter.h"
 #include "ob_location_adapter.h"
 #include "ob_log_flashback_service.h"                    // ObLogFlashbackService
 #include "ob_log_handler.h"
@@ -81,7 +80,6 @@ class PalfEnv;
 namespace storage
 {
 class ObLSService;
-class ObLocalityManager;
 }
 
 namespace logservice
@@ -111,8 +109,7 @@ public:
            share::ObLocationService *location_service,
            palf::ILogBlockPool *log_block_pool,
            common::ObMySQLProxy *sql_proxy,
-           IObNetKeepAliveAdapter *net_keepalive_adapter,
-           storage::ObLocalityManager *locality_manager);
+           IObNetKeepAliveAdapter *net_keepalive_adapter);
   //--Log stream related interfaces--
   //New log stream interface, this interface will create the corresponding directory for the log stream and create a new log stream with PalfBaseInfo as the log base point.
   //This includes generating and initializing the corresponding ObReplayStatus structure
@@ -244,6 +241,20 @@ private:
     int64_t unrecycable_log_disk_size_;
   };
 private:
+  class ObDefaultLocalityCb : public palf::PalfLocalityInfoCb
+  {
+  public:
+    int get_server_region(const common::ObAddr &server, common::ObRegion &region) const override final
+    {
+      int ret = OB_SUCCESS;
+      if (!server.is_valid()) {
+        ret = OB_INVALID_ARGUMENT;
+      } else {
+        region = DEFAULT_REGION_NAME;
+      }
+      return ret;
+    }
+  };
   bool is_inited_;
   bool is_running_;
   bool enable_shared_storage_;
@@ -262,7 +273,7 @@ private:
   ObLogFlashbackService flashback_service_;
   ObLogMonitor monitor_;
   ObSpinLock update_palf_opts_lock_;
-  ObLocalityAdapter locality_adapter_;
+  ObDefaultLocalityCb default_locality_cb_;
   // Restore service for standby log sync
   ObLogRestoreService restore_service_;
   // CDC service for log fetcher (standby log sync server side)

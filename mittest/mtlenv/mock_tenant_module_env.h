@@ -83,7 +83,6 @@
 #include "storage/mock_disk_usage_report.h"
 #include "share/deadlock/ob_deadlock_detector_mgr.h"
 #include "storage/ob_relative_table.h"
-#include "storage/ob_locality_manager.h"
 #include "share/scn.h"
 #include "mock_gts_source.h"
 #include "storage/blocksstable/ob_shared_macro_block_manager.h"
@@ -383,7 +382,6 @@ private:
   sql::ObSql sql_engine_;
   ObSQLSessionMgr session_mgr_;
   common::ObMysqlRandom scramble_rand_;
-  ObLocalityManager locality_manager_;
   common::ObMySQLProxy sql_proxy_;
   MockObGtsSource gts_source_;
   MockObTsMgr ts_mgr_;
@@ -636,7 +634,6 @@ void MockTenantModuleEnv::init_gctx_gconf()
   GCTX.cgroup_ctrl_ = &cgroup_ctrl_;
   GCTX.session_mgr_ = &session_mgr_;
   GCTX.scramble_rand_ = &scramble_rand_;
-  GCTX.locality_manager_ = &locality_manager_;
   (void) GCTX.set_server_id(1);
   GCTX.rs_rpc_proxy_ = &rs_rpc_proxy_;
   GCTX.srv_rpc_proxy_ = &srv_rpc_proxy_;
@@ -711,8 +708,6 @@ int MockTenantModuleEnv::init_before_start_mtl()
   scramble_rand_.init(static_cast<uint64_t>(start_time), static_cast<uint64_t>(start_time / 2));
   if (OB_FAIL(init_dir())) {
     STORAGE_LOG(WARN, "fail to init env", K(ret));
-  } else if (OB_FAIL(locality_manager_.init(self_addr_, &sql_proxy_))) {
-    STORAGE_LOG(WARN, "fail to init env", K(ret));
   } else if (OB_FAIL(prepare_io())) {
     STORAGE_LOG(WARN, "fail to init env", K(ret));
   } else if (OB_FAIL(session_mgr_.init())) {
@@ -752,8 +747,6 @@ int MockTenantModuleEnv::init_before_start_mtl()
     STORAGE_LOG(WARN, "fail to init env", K(ret));
   } else if (OB_FAIL(ObTsMgr::get_instance().start())) {
     STORAGE_LOG(WARN, "fail to init env", K(ret));
-  } else if (OB_FAIL(oceanbase::palf::election::GLOBAL_INIT_ELECTION_MODULE())) {
-    STORAGE_LOG(WARN, "fail to init env", K(ret));
   } else if (!GCTX.is_shared_storage_mode() && OB_FAIL(tmp_file::ObTmpBlockCache::get_instance().init("tmp_block_cache"))) {
     STORAGE_LOG(WARN, "init tmp block cache failed", KR(ret));
   } else if (OB_FAIL(tmp_file::ObTmpPageCache::get_instance().init("tmp_page_cache"))) {
@@ -769,7 +762,6 @@ int MockTenantModuleEnv::init_before_start_mtl()
   } else if (OB_FAIL(meta_db_pool_.init("./etc/meta.db"))) {
     STORAGE_LOG(ERROR, "init meta_db_pool_ failed", KR(ret));
   } else {
-    oceanbase::palf::election::INIT_TS = 1;
     // Ignore cgroup error
     cgroup_ctrl_.init();
     ObTsMgr::get_instance_inner() = &ts_mgr_;

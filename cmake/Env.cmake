@@ -53,7 +53,7 @@ ob_define(OB_ENABLE_UNITY ON)
 
 ob_define(OB_DISABLE_LSE OFF)
 
-ob_define(OB_DISABLE_PIE OFF)
+ob_define(OB_DISABLE_PIE ON)
 
 ob_define(OB_ENABLE_MCMODEL OFF)
 
@@ -183,7 +183,7 @@ if (OB_BUILD_SYS_VEC_IDX)
 endif()
  
 # should not use initial-exec for tls-model if building OBCDC.
-if(BUILD_CDC_ONLY OR BUILD_EMBED_MODE)
+if(BUILD_CDC_ONLY)
   add_definitions(-DOB_BUILD_CDC_DISABLE_VSAG)
 else()
   if(NOT BUILD_EMBED_MODE)
@@ -378,7 +378,7 @@ if (OB_USE_CLANG)
     elseif(UNIX)
       set(LD_OPT "-fuse-ld=${DEVTOOLS_DIR}/bin/ld.lld -Wno-unused-command-line-argument")
       set(REORDER_COMP_OPT "-ffunction-sections -fdata-sections -fdebug-info-for-profiling")
-      set(REORDER_LINK_OPT "-Wl,--no-rosegment,--build-id=sha1,--gc-sections,--icf=safe ${HOTFUNC_OPT}")
+      set(REORDER_LINK_OPT "-Wl,--no-rosegment,--build-id=sha1,--gc-sections,--icf=all ${HOTFUNC_OPT}")
       set(OB_LD_BIN "${DEVTOOLS_DIR}/bin/ld.lld")
     endif()
   endif()

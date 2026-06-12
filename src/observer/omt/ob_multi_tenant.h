@@ -21,6 +21,8 @@
 #include <functional>
 #include "lib/container/ob_vector.h"
 #include "lib/lock/ob_bucket_lock.h"    // ObBucketLock
+#include "lib/task/ob_timer_service.h"  // ObTimerTask
+#include "lib/thread/thread_mgr_interface.h"
 #include "ob_tenant_node_balancer.h"
 
 namespace oceanbase
@@ -76,8 +78,7 @@ class ObTenantMeta;
 typedef common::ObVector<uint64_t> TenantIdList;
 
 // This is the entry class of OMT module.
-class ObMultiTenant
-    : public share::ObThreadPool
+class ObMultiTenant : public common::ObTimerTask
 {
 public:
   const     static int64_t TIME_SLICE_PERIOD        = 10000;
@@ -166,7 +167,7 @@ public:
   int dec_tenant_ddl_count(const uint64_t tenant_id);
 
 protected:
-  void run1();
+  virtual void runTimerTask() override;
   int get_tenant_unsafe(ObTenant *&tenant) const;
   int construct_meta_for_hidden_sys(ObTenantMeta &meta);
   int create_virtual_tenants();
@@ -207,6 +208,8 @@ protected:
   bool cpu_dump_;
   bool has_synced_;
   bool tenant_active_;
+  int timer_tg_id_;
+  bool timer_stopped_;
   static ObICtxMemConfigGetter *mcg_;
 
 private:

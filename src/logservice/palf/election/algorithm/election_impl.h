@@ -30,7 +30,6 @@
 #include "logservice/palf/election/utils/election_utils.h"
 #include "logservice/palf/election/utils/election_args_checker.h"
 #include "logservice/palf/election/message/election_message.h"
-#include "logservice/palf/election/utils/election_event_recorder.h"
 
 namespace oceanbase
 {

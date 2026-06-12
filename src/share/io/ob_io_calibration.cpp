@@ -598,25 +598,9 @@ void ObIOBenchController::run1()
       }
     }
   }
-  if (OB_SUCC(ret)) {
-    ObMySQLTransaction trans;
-    if (!io_ability.is_valid()) {
-      ret = OB_ERR_SYS;
-      LOG_WARN("io ability from benchmark is invalid", K(ret), K(io_ability));
-    } else if (OB_FAIL(trans.start(&OBSERVER.get_mysql_proxy(), OB_SYS_TENANT_ID))) {
-      LOG_WARN("start transaction failed", K(ret));
-    } else {
-      const ObAddr &self_addr = OBSERVER.get_self();
-      if (OB_FAIL(ObIOCalibration::get_instance().write_into_table(trans, self_addr, io_ability))) {
-        LOG_WARN("write io calibration data failed", K(ret), K(self_addr), K(io_ability));
-      }
-      bool is_commit = OB_SUCCESS == ret;
-      int tmp_ret = trans.end(is_commit);
-      if (OB_UNLIKELY(OB_SUCCESS != tmp_ret)) {
-        LOG_WARN("end transaction failed", K(tmp_ret), K(is_commit));
-        ret = OB_SUCC(ret) ? tmp_ret : ret;
-      }
-    }
+  if (OB_SUCC(ret) && !io_ability.is_valid()) {
+    ret = OB_ERR_SYS;
+    LOG_WARN("io ability from benchmark is invalid", K(ret), K(io_ability));
   }
   if (OB_SUCC(ret)) {
     if (OB_FAIL(ObIOCalibration::get_instance().update_io_ability(io_ability))) {
@@ -679,7 +663,6 @@ int ObIOCalibration::init()
     LOG_WARN("io calibration init twice", K(ret), K(is_inited_));
   } else {
     is_inited_ = true;
-    (void)read_from_table();//ignore ret
   }
   if (OB_UNLIKELY(!is_inited_)) {
     destroy();
@@ -777,18 +760,6 @@ void ObIOCalibration::get_iops_scale(const ObIOMode mode, const int64_t size, do
   }
 }
 
-int ObIOCalibration::read_from_table()
-{
-  int ret = OB_SUCCESS;
-  return ret;
-}
-
-int ObIOCalibration::write_into_table(ObMySQLTransaction &trans, const ObAddr &addr, const ObIOAbility &io_ability)
-{
-  int ret = OB_SUCCESS;
-  return ret;
-}
-
 int ObIOCalibration::refresh(const bool only_refresh, const ObIArray<ObIOBenchResult> &items)
 {
   int ret = OB_SUCCESS;
@@ -799,9 +770,7 @@ int ObIOCalibration::refresh(const bool only_refresh, const ObIArray<ObIOBenchRe
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(only_refresh), K(items.count()));
   } else if (only_refresh) {
-    if (OB_FAIL(read_from_table())) {
-      LOG_WARN("read io calibration table failed", K(ret));
-    }
+    // no-op: persistence path is removed.
   } else if (items.count() > 0) {
     ObIOAbility io_ability;
     for (int64_t i = 0; OB_SUCC(ret) && i < items.count(); ++i) {
@@ -900,5 +869,3 @@ int ObIOCalibration::parse_calibration_string(const ObString &calibration_string
   }
   return ret;
 }
-
-

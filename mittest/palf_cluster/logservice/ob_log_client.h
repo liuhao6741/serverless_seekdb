@@ -22,7 +22,6 @@
 #include "lib/hash/ob_linear_hash_map.h"        // ObLinearHashMap
 #include "lib/lock/ob_tc_rwlock.h"              // RWLock
 #include "common/ob_member_list.h"              // common::ObMemberList
-#include "storage/ob_locality_manager.h"        // ObLocalityManager
 #include "logservice/palf/palf_handle_impl.h"
 #include "logservice/ob_log_handler.h"
 #include "logservice/ob_log_service.h"

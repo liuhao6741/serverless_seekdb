@@ -127,7 +127,6 @@ int ObTableLoadUtils::create_session_info(sql::ObSQLSessionInfo *&session_info, 
     LOG_WARN("alloc session id failed", KR(ret));
   } else if (OB_FAIL(GCTX.session_mgr_->create_session(
               tenant_id, sid, proxy_sid, ObTimeUtility::current_time(), session_info))) {
-    GCTX.session_mgr_->mark_sessid_unused(sid);
     session_info = nullptr;
     LOG_WARN("create session failed", KR(ret), K(sid));
   } else {
@@ -147,7 +146,6 @@ void ObTableLoadUtils::free_session_info(sql::ObSQLSessionInfo *session_info, co
     session_info->set_session_sleep();
     GCTX.session_mgr_->revert_session(session_info);
     GCTX.session_mgr_->free_session(free_session_ctx);
-    GCTX.session_mgr_->mark_sessid_unused(free_session_ctx.sessid_);
     session_info = nullptr;
   }
 }

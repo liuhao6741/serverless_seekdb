@@ -71,7 +71,6 @@
 #include "observer/dbms_job/ob_dbms_job_rpc_proxy.h"
 #include "observer/ob_inner_sql_rpc_proxy.h"
 #include "observer/ob_startup_accel_task_handler.h"
-#include "storage/ob_locality_manager.h"
 #include "storage/ddl/ob_ddl_heart_beat_task.h"
 
 #include "storage/ob_disk_usage_reporter.h"
@@ -173,20 +172,6 @@ public:
     bool is_inited_;
   };
 
-  class ObRefreshIOCalibrationTimeTask: public common::ObTimerTask
-  {
-  public:
-    ObRefreshIOCalibrationTimeTask();
-    virtual ~ObRefreshIOCalibrationTimeTask() {}
-    int init(ObServer *observer, int tg_id);
-    virtual void runTimerTask() override;
-  private:
-    const static int64_t REFRESH_INTERVAL = 10 * 1000L * 1000L;//10s
-    ObServer *obs_;
-    int tg_id_;
-    bool is_inited_;
-  };
-
   class ObRefreshTime {
   public:
     explicit ObRefreshTime(ObServer *obs): obs_(obs){}
@@ -247,7 +232,7 @@ public:
   share::ObLocationService &get_location_service() { return location_service_; }
 private:
   int stop();
-  int wait_client_exit();
+  int wait_no_client();
 
 private:
   ObServer();
@@ -255,6 +240,7 @@ private:
 
   int init_config(const ObServerOptions &opts);
   int init_opts_config(const ObServerOptions &opts, const char *optstr); // init configs from command line
+  int init_create_func();
   int init_data_dir_and_redo_dir(const ObServerOptions &opts);
   int init_self_addr();
   int init_config_module(const char *optstr);
@@ -294,7 +280,6 @@ private:
   int start_log_mgr();
   int stop_log_mgr();
   int refresh_cpu_frequency();
-  int refresh_io_calibration();
   int clean_up_invalid_tables();
   int clean_up_invalid_tables_by_tenant(const uint64_t tenant_id);
   int init_ctas_clean_up_task(); //Regularly clean up the residuals related to querying and building tables and temporary tables
@@ -303,7 +288,6 @@ private:
   int refresh_temp_table_sess_active_time();
   int init_refresh_active_time_task(); //Regularly update the sess_active_time of the temporary table created by the proxy connection sess
   int init_refresh_cpu_frequency();
-  int init_refresh_io_calibration();
   int set_running_mode();
   void check_user_tenant_schema_refreshed(const common::ObIArray<uint64_t> &tenant_ids, const int64_t expire_time);
   void check_log_replay_over(const common::ObIArray<uint64_t> &tenant_ids, const int64_t expire_time);
@@ -335,6 +319,10 @@ private:
   volatile bool has_stopped_;
   bool has_destroy_;
   bool embedded_ = false;
+  int clients_fd_ = -1;
+#ifdef _WIN32
+  HANDLE clients_h_ = INVALID_HANDLE_VALUE;
+#endif
   // The network framework in OceanBase is all defined at ObServerNetworkFrame.
   ObSrvNetworkFrame net_frame_;
   obrpc::ObBatchRpc batch_rpc_;
@@ -442,13 +430,9 @@ private:
   ObRedefTableHeartBeatTask redef_table_heart_beat_task_;
   ObRefreshTimeTask refresh_active_time_task_; // repeat & no retry
   ObRefreshCpuFreqTimeTask refresh_cpu_frequency_task_;
-  ObRefreshIOCalibrationTimeTask refresh_io_calibration_task_; // retry to success & no repeat
   blocksstable::ObStorageEnv storage_env_;
   share::ObSchemaStatusProxy schema_status_proxy_;
   ObDeviceCredentialTask device_credential_task_;
-
-  // for locality
-  ObLocalityManager locality_manager_;
 
   bool is_log_dir_empty_;
   sql::ObConnectResourceMgr conn_res_mgr_;

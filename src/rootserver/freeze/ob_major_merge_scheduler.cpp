@@ -124,7 +124,7 @@ int ObMajorMergeScheduler::init(
 int ObMajorMergeScheduler::start()
 {
   int ret = OB_SUCCESS;
-  lib::Threads::set_run_wrapper(MTL_CTX());
+  set_run_wrapper(MTL_CTX());
   if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;
     LOG_WARN("ObMajorMergeScheduler not init", KR(ret));

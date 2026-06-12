@@ -18,7 +18,6 @@
 #include "ob_route_policy.h"
 #include "sql/optimizer/ob_replica_compare.h"
 #include "sql/optimizer/ob_log_plan.h"
-#include "storage/ob_locality_manager.h"
 using namespace oceanbase::common;
 using namespace oceanbase::share;
 using namespace oceanbase::storage;

@@ -17,7 +17,7 @@
 #ifndef OCEANBASE_TRANSACTION_KEEP_ALIVE_SERVICE_
 #define OCEANBASE_TRANSACTION_KEEP_ALIVE_SERVICE_
 
-#include "lib/thread/thread_pool.h"
+#include "lib/thread/thread_mgr_interface.h"
 
 #include "storage/tx_storage/ob_ls_service.h"
 
@@ -36,7 +36,7 @@ class ObLS;
 namespace transaction 
 {
 
-class ObTxLoopWorker : public lib::ThreadPool
+class ObTxLoopWorker : public common::ObTimerTask
 {
 public:
   // keep alive
@@ -58,7 +58,7 @@ public:
 
   void reset();
 
-  virtual void run1();
+  virtual void runTimerTask() override;
 
 private:
   int scan_all_ls_(bool can_tx_gc, bool can_gc_retain_ctx, bool can_check_and_retry_start_working, bool can_adjust_log_cb_pool);
@@ -76,6 +76,8 @@ private:
   int64_t last_check_start_working_retry_ts_;
   int64_t last_log_cb_pool_adjust_ts_;
   int64_t last_tenant_config_refresh_ts_;
+  int timer_tg_id_;
+  bool stop_flag_;
 };
 
 

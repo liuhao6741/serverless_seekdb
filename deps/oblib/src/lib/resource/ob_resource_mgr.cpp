@@ -211,7 +211,7 @@ bool ObTenantMemoryMgr::update_hold(const int64_t size, const uint64_t ctx_id,
   reach_ctx_limit = false;
   const int64_t limit = high_prio ? INT64_MAX : hard_limit_;
   const int64_t nvalue = ATOMIC_AAF(&sum_hold_, size); 
-  if (nvalue > limit) {
+  if (size > 0 && nvalue > limit) {
     ATOMIC_AAF(&sum_hold_, -size);
     updated = false;
     auto &afc = g_alloc_failed_ctx();
@@ -244,7 +244,7 @@ bool ObTenantMemoryMgr::update_ctx_hold(const uint64_t ctx_id, const int64_t siz
     } else {
       if (hold + size <= limit) {
         const int64_t nvalue = ATOMIC_AAF(&hold, size);
-        if (nvalue > limit) {
+        if (size > 0 && nvalue > limit) {
           ATOMIC_AAF(&hold, -size);
         } else {
           updated = true;

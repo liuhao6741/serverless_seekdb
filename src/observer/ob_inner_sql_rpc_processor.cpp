@@ -230,7 +230,6 @@ int ObInnerSqlRpcP::create_tmp_session(
     } else if (OB_FAIL(GCTX.session_mgr_->create_session(tenant_id, sid, proxy_sid,
                                                          ObTimeUtility::current_time(),
                                                          tmp_session))) {
-      GCTX.session_mgr_->mark_sessid_unused(sid);
       tmp_session = NULL;
       LOG_WARN("create session failed", K(ret), K(sid));
     } else {
@@ -259,7 +258,6 @@ void ObInnerSqlRpcP::cleanup_tmp_session(
     GCTX.session_mgr_->revert_session(tmp_session);
     GCTX.session_mgr_->free_session(free_session_ctx);
     tmp_session = NULL;
-    GCTX.session_mgr_->mark_sessid_unused(free_session_ctx.sessid_);
   }
 }
 

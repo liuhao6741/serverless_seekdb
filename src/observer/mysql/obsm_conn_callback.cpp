@@ -140,10 +140,6 @@ int ObSMConnectionCallback::init(ObSqlSockSession& sess, ObSMConnection& conn)
     sess.set_tls_version_option(tls_version_option);
     LOG_INFO("sm conn init succ", K(conn.sessid_), K(sess.client_addr_));
   }
-  //If the current function encounters an error, it should mark_sessid_unused within the current function
-  if (OB_SUCCESS == ret && OB_SUCCESS == conn.ret_) {
-    conn.is_need_clear_sessid_ = true;
-  }
   return ret;
 }
 
@@ -162,7 +158,6 @@ static void sm_conn_unlock_tenant(ObSMConnection& conn)
 void ObSMConnectionCallback::destroy(ObSMConnection& conn)
 {
   int ret = OB_SUCCESS;
-  bool is_need_clear = false;
   sql::ObDisconnectState disconnect_state = sql::ObDisconnectState::DIS_INIT;
   ObCurTraceId::TraceId trace_id;
   if (conn.is_sess_alloc_) {
@@ -214,16 +209,7 @@ void ObSMConnectionCallback::destroy(ObSMConnection& conn)
       }
    }
   } else {
-    if (OB_UNLIKELY(OB_FAIL(sql::ObSQLSessionMgr::is_need_clear_sessid(&conn, is_need_clear)))) {
-      LOG_ERROR("fail to judge need clear", K(ret));
-    } else if (is_need_clear) {
-      if (OB_FAIL(GCTX.session_mgr_->mark_sessid_unused(conn.sessid_))) {
-        LOG_ERROR("fail to mark sessid unused", K(ret), K(conn.sessid_),
-                  "proxy_sessid", conn.proxy_sessid_);
-      } else {
-        LOG_INFO("mark session id unused", K(conn.sessid_));
-      }
-    }
+    // sessid no longer needs to be recycled in seekdb
   }
   common::ObDiagnosticInfo *di = conn.get_diagnostic_info();
   if (OB_NOT_NULL(di)) {

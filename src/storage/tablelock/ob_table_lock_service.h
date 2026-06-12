@@ -20,8 +20,8 @@
 #include <stdint.h>
 
 #include "common/ob_tablet_id.h"
+#include "lib/task/ob_timer.h"
 #include "share/ob_ls_id.h"
-#include "share/ob_occam_timer.h"
 #include "sql/ob_sql_trans_control.h"
 #include "storage/tablelock/ob_table_lock_common.h"
 #include "storage/tablelock/ob_table_lock_rpc_proxy.h"
@@ -181,9 +181,7 @@ private:
 public:
   class ObOBJLockGarbageCollector
   {
-    static const int OBJ_LOCK_GC_THREAD_NUM = 2;
   public:
-    friend class ObLockTable;
     ObOBJLockGarbageCollector();
     ~ObOBJLockGarbageCollector();
   public:
@@ -196,18 +194,26 @@ public:
     TO_STRING_KV(KP(this),
                  K_(last_success_timestamp));
   private:
+    class TimerTask : public common::ObTimerTask
+    {
+    public:
+      explicit TimerTask(ObOBJLockGarbageCollector &collector) : collector_(collector) {}
+      virtual ~TimerTask() = default;
+      void runTimerTask() override { collector_.run_gc_once_(); }
+    private:
+      ObOBJLockGarbageCollector &collector_;
+    };
+  private:
+    void run_gc_once_();
     int garbage_collect_for_all_ls_();
     void check_and_report_timeout_();
     int check_is_leader_(ObLS *ls, bool &is_leader);
   public:
-    static int64_t GARBAGE_COLLECT_PRECISION;
     static int64_t GARBAGE_COLLECT_EXEC_INTERVAL;
     static int64_t GARBAGE_COLLECT_TIMEOUT;
   private:
-    common::ObOccamThreadPool obj_lock_gc_thread_pool_;
-    common::ObOccamTimer timer_;
-    common::ObOccamTimerTaskRAIIHandle timer_handle_;
-
+    int tg_id_;
+    TimerTask timer_task_;
     int64_t last_success_timestamp_;
   };
 

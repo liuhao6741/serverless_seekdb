@@ -24,7 +24,6 @@
 #include "sql/plan_cache/ob_plan_cache_util.h"
 #include "sql/plan_cache/ob_pcv_set.h"
 #include "../optimizer/ob_mock_part_mgr.h"
-#include "sql/optimizer/mock_locality_manger.h"
 
 using namespace oceanbase::common;
 using namespace oceanbase::json;
@@ -141,7 +140,6 @@ void generate_plan(TestSqlCtx &test_sql_ctx, const char *query,
 {
   ObArenaAllocator allocator(ObModIds::TEST);
   MockPartitionService partition_service;
-  MockLocalityManager locality_manager;
   ObRawExprFactory expr_factory(allocator);
   ObStmtFactory stmt_factory0(allocator);
   ObStmtFactory stmt_factory1(allocator);
@@ -180,7 +178,6 @@ void generate_plan(TestSqlCtx &test_sql_ctx, const char *query,
     exec_ctx[i].set_my_session(&(session[i]));
     exec_ctx[i].set_sql_ctx(&sql_ctx[i]);
     GCTX.par_ser_ = &partition_service;
-    GCTX.locality_manager_ = &locality_manager;
     exec_ctx[i].get_task_executor_ctx()->set_min_cluster_version(CLUSTER_VERSION_1500);
   }
   ObLogPlan *logical_plan[TEST_PLAN_NUM];

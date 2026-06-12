@@ -151,22 +151,19 @@ bool ObSimpleThreadPoolBase<T>::do_add_worker()
       OB_DELETE(Worker, "QThWker", w);
       return false;
     }
-    // Prevent reap_workers() from deleting this worker before start():
-    // the Threads constructor sets stop_=true, but this worker is not
-    // actually stopping — it just hasn't started yet.
-    w->has_set_stop() = false;
-    if (!workers_.add_last(&w->worker_node_)) {
-      OB_DELETE(Worker, "QThWker", w);
-      return false;
-    }
   }
   // Start outside the lock: the new worker may call try_expand_one →
   // do_add_worker, which would deadlock if we held workers_lock_
   if (OB_SUCCESS != w->start()) {
-    lib::ObMutexGuard g(workers_lock_);
-    workers_.remove(&w->worker_node_);
     OB_DELETE(Worker, "QThWker", w);
     return false;
+  }
+  // Add to list only after successful start, so reap_workers() never
+  // sees a worker whose start() is still in flight.
+  {
+    lib::ObMutexGuard g(workers_lock_);
+    bool ok = workers_.add_last(&w->worker_node_);
+    abort_unless(ok);
   }
   return true;
 }

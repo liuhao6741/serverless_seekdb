@@ -72,7 +72,6 @@ TG_DEF(CompactionRefresh, CompactionRefresh, TIMER)
 TG_DEF(WriteCkpt, WriteCkpt, TIMER)
 // TG_DEF(EXTLogWash, EXTLogWash, TIMER)
 // TG_DEF(LineCache, LineCache, TIMER)
-TG_DEF(LocalityReload, LocalityReload, TIMER)
 // TG_DEF(MemstoreGC, MemstoreGC, TIMER)
 TG_DEF(DiskUseReport, DiskUseReport, TIMER)
 // TG_DEF(CLOGReqMinor, CLOGReqMinor, TIMER)
@@ -174,31 +173,6 @@ TG_DEF(TntSharedTimer, TntSharedTimer, TIMER)
 TG_DEF(VectorAsyncTaskPool, VectorAsyncTask, QUEUE_THREAD, 1, 8)   // for tmp
 TG_DEF(VectorTaskPool, VectorTaskPool, QUEUE_THREAD, 1, 1024)
 
-#ifdef OB_BUILD_SHARED_STORAGE
-TG_DEF(ReplicaPrewarmHdlr, RepPrewarmHdlr, QUEUE_THREAD, 1, storage::ObReplicaPrewarmHandler::MAX_TASK_NUM)
-TG_DEF(MicCacheLTimer, MicCacheLTimer, TIMER)
-TG_DEF(MicCacheMTimer, MicCacheMTimer, TIMER)
-TG_DEF(MicCacheHTimer, MicCacheHTimer, TIMER)
-TG_DEF(SSTmpFileAFlush, TmpFileAFlush, TIMER)
-TG_DEF(SSTmpFileARemove, TmpFileARemove, TIMER)
-TG_DEF(SSTmpFileShrinkWBP, TmpFileShrink, TIMER)
-TG_DEF(TmpFileFlushTimer, TmpFileFlushTimer, TIMER)
-TG_DEF(TmpFilePrereadTimer, TmpFilePrereadTimer, TIMER)
-TG_DEF(ReplicaPrewarmTimer, ReplicaPrewarmTimer, TIMER)
-TG_DEF(StorageCachePolicyMgr, StorageCachePolicyMgr, TIMER)
-TG_DEF(StorageCacheTabletScheduler, StorageCacheTabletScheduler, QUEUE_THREAD, 1, storage::ObStorageCacheTabletScheduler::MAX_TASK_NUM)
-TG_DEF(TenantDirGCTimer, TntGCTimer, TIMER)
-TG_DEF(ObPublicBlockGCThread, PubGCThread, QUEUE_THREAD,
-       ThreadCountPair(storage::ObPublicBlockGCThread::THREAD_NUM,
-       storage::ObPublicBlockGCThread::MINI_MODE_THREAD_NUM),
-       storage::ObPublicBlockGCThread::MAX_BLOCK_GC_TASK_NUM)
-TG_DEF(ObPrivateBlockGCThread, PrivGCThread, QUEUE_THREAD,
-       ThreadCountPair(storage::ObPrivateBlockGCThread::THREAD_NUM,
-       storage::ObPrivateBlockGCThread::MINI_MODE_THREAD_NUM),
-       storage::ObPrivateBlockGCThread::MAX_BLOCK_GC_TASK_NUM)
-#endif
-
-
 TG_DEF(TmpFileSwap, TFSwap, THREAD_POOL, 1)
 TG_DEF(TableGroupCommitMgr, TableGroupCommitMgr, TIMER)
 TG_DEF(TmpFileFlush, TFFlush, TIMER)
@@ -208,6 +182,7 @@ TG_DEF(SyslogPerErrLimiter, LogLimiterRefresher, TIMER)
 TG_DEF(BGThreadMonitor, BGThreadMonitor, TIMER)
 TG_DEF(OmtNodeBalancer, OmtNodeBalancer, TIMER)
 TG_DEF(RootServiceMonitor, RSMonitor, TIMER)
+TG_DEF(RootServiceTaskTimer, RSTaskTimer, TIMER)
 TG_DEF(RsThreadChecker, RsThreadChecker, TIMER)
 TG_DEF(GlobalElectionReport, GEleTimer, TIMER)
 TG_DEF(RsMasterKeyManager, RsMKM, TIMER)
@@ -219,4 +194,9 @@ TG_DEF(TenantFreezer, FrzTrigger, TIMER)
 TG_DEF(CommonLSService, COMMONLSSe, TIMER)
 TG_DEF(PxTargetMgr, PxTargetMgr, TIMER)
 TG_DEF(SysTntLoadSysPacTimer, SysTntLoadSysPacTimer, TIMER)
+TG_DEF(MultiTenantTimer, MultiTenantTimer, TIMER)
+TG_DEF(SchemaRecTimer, SchemaRecTimer, TIMER)
+TG_DEF(FrzInfoDetTimer, FrzInfoDetTimer, TIMER)
+TG_DEF(MFLaunchTimer, MFLaunchTimer, TIMER)
+TG_DEF(TxLoopWorkerTimer, TxLoopWorkerTimer, TIMER)
 #endif

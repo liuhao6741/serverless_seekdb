@@ -35,11 +35,8 @@ int ObTxLoopWorker::mtl_init(ObTxLoopWorker *& ka)
 int ObTxLoopWorker::init()
 {
   int ret = OB_SUCCESS;
-  int64_t pos = 0;
 
   TRANS_LOG(INFO, "[Tx Loop Worker] init");
-
-  lib::ThreadPool::set_run_wrapper(MTL_CTX());
 
   return ret;
 }
@@ -49,9 +46,14 @@ int ObTxLoopWorker::start()
   int ret = OB_SUCCESS;
 
   TRANS_LOG(INFO, "[Tx Loop Worker] start");
-  if (OB_FAIL(lib::ThreadPool::start())) {
-    TRANS_LOG(WARN, "[Tx Loop Worker] start tx loop worker thread failed", K(ret));
+  if (OB_FAIL(TG_CREATE_TENANT(lib::TGDefIDs::TxLoopWorkerTimer, timer_tg_id_))) {
+    TRANS_LOG(WARN, "[Tx Loop Worker] create timer failed", K(ret), K_(timer_tg_id));
+  } else if (OB_FAIL(TG_START(timer_tg_id_))) {
+    TRANS_LOG(WARN, "[Tx Loop Worker] start timer failed", K(ret), K_(timer_tg_id));
+  } else if (OB_FAIL(TG_SCHEDULE(timer_tg_id_, *this, LOOP_INTERVAL, true/*is_repeat*/))) {
+    TRANS_LOG(WARN, "[Tx Loop Worker] schedule timer failed", K(ret), K_(timer_tg_id));
   } else {
+    stop_flag_ = false;
     // TRANS_LOG(INFO, "[Tx Loop Worker] start keep alive thread succeed", K(ret));
   }
 
@@ -61,19 +63,27 @@ int ObTxLoopWorker::start()
 void ObTxLoopWorker::stop()
 {
   TRANS_LOG(INFO, "[Tx Loop Worker] stop");
-  lib::ThreadPool::stop();
+  if (!stop_flag_ && timer_tg_id_ != -1) {
+    TG_STOP(timer_tg_id_);
+    stop_flag_ = true;
+  }
 }
 
 void ObTxLoopWorker::wait()
 {
   TRANS_LOG(INFO, "[Tx Loop Worker] wait");
-  lib::ThreadPool::wait();
+  if (timer_tg_id_ != -1) {
+    TG_WAIT(timer_tg_id_);
+  }
 }
 
 void ObTxLoopWorker::destroy()
 {
   TRANS_LOG(INFO, "[Tx Loop Worker] destroy");
-  lib::ThreadPool::destroy();
+  if (timer_tg_id_ != -1) {
+    TG_DESTROY(timer_tg_id_);
+    timer_tg_id_ = -1;
+  }
   reset();
 }
 
@@ -84,9 +94,11 @@ void ObTxLoopWorker::reset()
   last_check_start_working_retry_ts_ = 0;
   last_log_cb_pool_adjust_ts_ = 0;
   last_tenant_config_refresh_ts_ = 0;
+  timer_tg_id_ = -1;
+  stop_flag_ = true;
 }
 
-void ObTxLoopWorker::run1()
+void ObTxLoopWorker::runTimerTask()
 {
   int ret = OB_SUCCESS;
   int64_t start_time_us = 0;
@@ -97,11 +109,10 @@ void ObTxLoopWorker::run1()
   bool can_check_and_retry_start_working = false;
   bool can_adjust_log_cb_pool =  false;
 
-  while (!has_set_stop()) {
-    start_time_us = ObTimeUtility::current_time();
-    if (REACH_TIME_INTERVAL(60000000)) {
-      ObLeakChecker::dump();
-    }
+  start_time_us = ObTimeUtility::current_time();
+  if (REACH_TIME_INTERVAL(60000000)) {
+    ObLeakChecker::dump();
+  }
 
     // tx gc, interval = 5s
     if (common::ObClockGenerator::getClock() - last_tx_gc_ts_ > TX_GC_INTERVAL) {
@@ -138,24 +149,20 @@ void ObTxLoopWorker::run1()
       last_tenant_config_refresh_ts_ = common::ObClockGenerator::getClock();
     }
 
-    (void)scan_all_ls_(can_gc_tx, can_gc_retain_ctx, can_check_and_retry_start_working, can_adjust_log_cb_pool);
+  (void)scan_all_ls_(can_gc_tx, can_gc_retain_ctx, can_check_and_retry_start_working, can_adjust_log_cb_pool);
 
     // TODO shanyan.g
     // 1) We use max(max_commit_ts, gts_cache) as read snapshot,
     //    but now we adopt updating max_commit_ts periodly to avoid getting gts cache cost
     // 2) Some time later, we will revert current modification when performance problem solved;
-      update_max_commit_ts_();
+  update_max_commit_ts_();
 
-    time_used = ObTimeUtility::current_time() - start_time_us;
-
-    if (time_used < LOOP_INTERVAL) {
-      ob_usleep(LOOP_INTERVAL- time_used, true/*is_idle_sleep*/);
-    }
-    can_gc_tx = false;
-    can_gc_retain_ctx = false;
-    can_check_and_retry_start_working = false;
-    can_adjust_log_cb_pool = false;
-  }
+  time_used = ObTimeUtility::current_time() - start_time_us;
+  UNUSED(time_used);
+  can_gc_tx = false;
+  can_gc_retain_ctx = false;
+  can_check_and_retry_start_working = false;
+  can_adjust_log_cb_pool = false;
 }
 
 int ObTxLoopWorker::scan_all_ls_(bool can_tx_gc,

@@ -311,7 +311,6 @@ int ObTruncatePartKeyInfo::create_tmp_session(
     LOG_WARN("Failed to create sess id", K(ret), K(tenant_id));
   } else if (OB_FAIL(GCTX.session_mgr_->create_session(
              OB_SYS_TENANT_ID, sid, proxy_sid, ObTimeUtility::current_time(), session))) {
-    GCTX.session_mgr_->mark_sessid_unused(sid);
     session = nullptr;
     LOG_WARN("Failed to create session", K(ret), K(sid), K(tenant_id));
   } else {
@@ -345,7 +344,6 @@ void ObTruncatePartKeyInfo::release_tmp_session(ObFreeSessionCtx &free_session_c
     session->set_session_sleep();
     GCTX.session_mgr_->revert_session(session);
     GCTX.session_mgr_->free_session(free_session_ctx);
-    GCTX.session_mgr_->mark_sessid_unused(free_session_ctx.sessid_);
     session = nullptr;
   }
 }

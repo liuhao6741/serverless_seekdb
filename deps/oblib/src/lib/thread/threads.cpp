@@ -28,11 +28,22 @@ using namespace oceanbase::common;
 // Use 512KB stack size, OB has SMART_CALL mechanism to extend stack when needed
 int64_t global_thread_stack_size = (1L << 19) - SIG_STACK_SIZE - ACHUNK_PRESERVE_SIZE;
 thread_local uint64_t ThreadPool::thread_idx_ = 0;
+static IRunWrapper *g_default_run_wrapper = nullptr;
 // Get the thread-local tenant context, for use when checking at thread pool startup
 IRunWrapper *&Threads::get_expect_run_wrapper()
 {
   static thread_local IRunWrapper *instance = nullptr;
   return instance;
+}
+
+void Threads::set_default_run_wrapper(IRunWrapper *run_wrapper)
+{
+  g_default_run_wrapper = run_wrapper;
+}
+
+IRunWrapper *Threads::get_default_run_wrapper()
+{
+  return g_default_run_wrapper;
 }
 
 Threads::~Threads()

@@ -25,7 +25,6 @@
 #include "share/stat/ob_dbms_stats_lock_unlock.h"
 #include "share/stat/ob_dbms_stats_history_manager.h"
 #include "share/stat/ob_index_stats_estimator.h"
-#include "storage/ob_locality_manager.h"
 #include "sql/engine/expr/ob_expr_uuid.h"
 #include "sql/optimizer/ob_optimizer_util.h"
 #include "share/resource_manager/ob_resource_manager.h"

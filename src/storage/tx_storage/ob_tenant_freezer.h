@@ -123,7 +123,7 @@ public:
   const static int64_t TIME_WHEEL_PRECISION = 100_ms;
   const static int64_t SLOW_FREEZE_INTERVAL = 30_s;
   const static int FREEZE_TRIGGER_THREAD_NUM= 1;
-  const static int FREEZE_THREAD_NUM= 5;
+  const static int FREEZE_THREAD_NUM= 1;
   const static int64_t FREEZE_TRIGGER_INTERVAL = 2_s;
   const static int64_t UPDATE_INTERVAL = 100_ms;
   const static int64_t MAX_FREEZE_TIMEOUT_US = 1800 * 1000 * 1000; // 30 min

@@ -12,7 +12,6 @@ ob_set_subtarget(ob_logservice common
   ob_log_external_storage_handler.cpp
   ob_log_external_storage_utils.cpp
   ob_log_monitor.cpp
-  ob_locality_adapter.cpp
 )
 
 ob_set_subtarget(ob_logservice common_mixed
@@ -112,7 +111,6 @@ ob_set_subtarget(ob_logservice palf
 ob_set_subtarget(ob_logservice palf_election
   palf/election/algorithm/election_impl.cpp
   palf/election/message/election_message.cpp
-  palf/election/utils/election_event_recorder.cpp
   palf/election/utils/election_member_list.cpp
   palf/election/utils/election_utils.cpp
 )

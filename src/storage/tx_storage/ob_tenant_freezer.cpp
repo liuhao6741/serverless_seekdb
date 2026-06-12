@@ -17,6 +17,7 @@
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_tenant_freezer.h"
+#include "lib/ob_running_mode.h"
 #include "observer/ob_srv_network_frame.h"
 #include "rootserver/freeze/ob_major_freeze_helper.h"
 #include "share/allocator/ob_shared_memory_allocator_mgr.h"
@@ -90,7 +91,7 @@ int ObTenantFreezer::init()
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("[TenantFreezer] invalid argument", KR(ret), KP(GCTX.srv_rpc_proxy_),
              KP(GCTX.rs_rpc_proxy_), K(GCONF.self_addr_));
-  } else if (OB_FAIL(freeze_thread_pool_.init_and_start(FREEZE_THREAD_NUM))) {
+  } else if (OB_FAIL(freeze_thread_pool_.init_and_start(FREEZE_THREAD_NUM, 10, "FrzAsync"))) {
     LOG_WARN("[TenantFreezer] fail to initialize freeze thread pool", KR(ret));
   } else if (OB_FAIL(TG_CREATE_TENANT(lib::TGDefIDs::TenantFreezer, freeze_trigger_tg_id_))) {
     LOG_WARN("[TenantFreezer] fail to create TenantFreezer", KR(ret));
@@ -106,6 +107,7 @@ int ObTenantFreezer::init()
     tenant_info_.tenant_id_ = MTL_ID();
     freezer_stat_.reset();
     freezer_history_.reset();
+    LOG_INFO("[TenantFreezer] init freeze thread pool success", "mini_mode", lib::is_mini_mode());
     is_inited_ = true;
   }
   return ret;

@@ -569,14 +569,8 @@ int ObAdminSetConfig::execute(obrpc::ObAdminSetConfigArg &arg)
       LOG_WARN("fail to process pre hook", K(arg), KR(ret));
     } else if (OB_FAIL(update_config(arg))) {
       LOG_WARN("update config failed", KR(ret), K(arg));
-      if (OB_ISNULL(ctx_.root_service_)) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("error inner stat", KR(ret), K(ctx_.root_service_));
-      } else if (OB_FAIL(ctx_.root_service_->set_config_post_hook(arg))) {
-        LOG_WARN("fail to set config callback", KR(ret));
-      } else {
-        LOG_INFO("set config succ", K(arg));
-      }
+    } else {
+      LOG_INFO("set config succ", K(arg));
     }
   }
   return ret;
@@ -733,24 +727,7 @@ int ObAdminRefreshIOCalibration::execute(const obrpc::ObAdminRefreshIOCalibratio
         LOG_WARN("invalid calibration list", K(ret), K(arg), K(io_ability));
       }
     }
-    if (OB_SUCC(ret)) {
-      ObMySQLTransaction trans;
-      if (OB_FAIL(trans.start(ctx_.sql_proxy_, OB_SYS_TENANT_ID))) {
-        LOG_WARN("start transaction failed", K(ret));
-      } else {
-        for (int64_t i = 0; OB_SUCC(ret) && i < server_list.count(); ++i) {
-          if (OB_FAIL(ObIOCalibration::get_instance().write_into_table(trans, server_list.at(i), io_ability))) {
-            LOG_WARN("write io ability failed", K(ret), K(io_ability), K(server_list.at(i)));
-          }
-        }
-        bool is_commit = OB_SUCCESS == ret;
-        int tmp_ret = trans.end(is_commit);
-        if (OB_UNLIKELY(OB_SUCCESS != tmp_ret)) {
-          LOG_WARN("end transaction failed", K(tmp_ret), K(is_commit));
-          ret = OB_SUCC(ret) ? tmp_ret : ret;
-        }
-      }
-    }
+    // write_into_table is removed; io ability is refreshed on each observer via RPC below.
   }
   if (OB_SUCC(ret)) {
     ObRefreshIOCalibrationArg refresh_arg;

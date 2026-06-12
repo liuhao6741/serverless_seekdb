@@ -21,6 +21,7 @@
 #include "rootserver/freeze/ob_major_freeze_helper.h"
 #include "share/ob_tablet_checksum_operator.h"
 #include "observer/ob_srv_network_frame.h"
+#include "share/rc/ob_tenant_base.h"
 
 namespace oceanbase
 {
@@ -31,15 +32,23 @@ using namespace share::schema;
 namespace rootserver
 {
 ObDailyMajorFreezeLauncher::ObDailyMajorFreezeLauncher(const uint64_t tenant_id)
-  : ObFreezeReentrantThread(tenant_id),
-    is_inited_(false),
+  : is_inited_(false),
+    is_paused_(false),
     already_launch_(false),
+    tenant_id_(tenant_id),
+    sql_proxy_(nullptr),
     config_(nullptr),
     gc_freeze_info_last_timestamp_(0),
     merge_info_mgr_(nullptr),
     last_check_tablet_ckm_us_(0),
-    tablet_ckm_gc_compaction_scn_(SCN::invalid_scn())
+    tablet_ckm_gc_compaction_scn_(SCN::invalid_scn()),
+    stop_(true)
 {
+}
+
+ObDailyMajorFreezeLauncher::~ObDailyMajorFreezeLauncher()
+{
+  (void)destroy();
 }
 
 int ObDailyMajorFreezeLauncher::init(
@@ -48,7 +57,7 @@ int ObDailyMajorFreezeLauncher::init(
     ObMajorMergeInfoManager &merge_info_manager)
 {
   int ret = OB_SUCCESS;
-  if (IS_INIT) {
+  if (is_inited_) {
     ret = OB_INIT_TWICE;
     LOG_WARN("init twice", KR(ret));
   } else {
@@ -59,6 +68,7 @@ int ObDailyMajorFreezeLauncher::init(
     tablet_ckm_gc_compaction_scn_ = SCN::invalid_scn();
     sql_proxy_ = &proxy;
     already_launch_ = false;
+    stop_ = false;
     is_inited_ = true;
   }
   return ret;
@@ -67,33 +77,31 @@ int ObDailyMajorFreezeLauncher::init(
 int ObDailyMajorFreezeLauncher::start()
 {
   int ret = OB_SUCCESS;
-  lib::Threads::set_run_wrapper(MTL_CTX());
-  if (IS_NOT_INIT) {
+  if (!is_inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("ObDailyMajorFreezeLauncher not init", KR(ret));
-  } else if (OB_FAIL(create(MAJOR_FREEZE_LAUNCHER_THREAD_CNT, "MFLaunch"))) {
-    LOG_WARN("fail to create major_freeze_launch thread", K_(tenant_id), KR(ret));
-  } else if (OB_FAIL(ObRsReentrantThread::start())) {
-    LOG_WARN("fail to start major_freeze_launch thread", K_(tenant_id), KR(ret));
+  } else if (OB_FAIL(TG_START(lib::TGDefIDs::MFLaunchTimer))) {
+    LOG_WARN("start MFLaunch timer failed", K_(tenant_id), KR(ret));
+  } else if (OB_FAIL(TG_SCHEDULE(lib::TGDefIDs::MFLaunchTimer, *this, LAUNCHER_INTERVAL_US, true/*is_repeat*/))) {
+    LOG_WARN("schedule MFLaunch timer failed", K_(tenant_id), KR(ret));
   } else {
+    stop_ = false;
     LOG_INFO("ObDailyMajorFreezeLauncher start succ", K_(tenant_id));
   }
   return ret;
 }
 
-void ObDailyMajorFreezeLauncher::run3()
+void ObDailyMajorFreezeLauncher::runTimerTask()
 {
   int ret = OB_SUCCESS;
   int tmp_ret = OB_SUCCESS;
-  if (IS_NOT_INIT) {
+  if (!is_inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("fail to run, not init", KR(ret));
+  } else if (stop_ || is_paused()) {
   } else {
-    LOG_INFO("start daily major_freeze_launcher", K_(tenant_id));
-    ObThreadCondGuard guard(get_cond());
-
-    while (!stop_) {
-      update_last_run_timestamp();
+    MTL_SWITCH(tenant_id_) {
+      LOG_INFO("start daily major_freeze_launcher", K_(tenant_id));
       LOG_TRACE("run daily major freeze launcher", K_(tenant_id));
 
       if (OB_FAIL(try_launch_major_freeze())) {
@@ -105,12 +113,40 @@ void ObDailyMajorFreezeLauncher::run3()
       if (OB_TMP_FAIL(try_gc_tablet_checksum())) {
         LOG_WARN("fail to try_gc_tablet_checksum", KR(tmp_ret), K_(tenant_id));
       }
-      if (OB_TMP_FAIL(try_idle(LAUNCHER_INTERVAL_US, ret))) {
-        LOG_WARN("fail to try_idle", KR(ret), KR(tmp_ret));
-      }
+      LOG_INFO("daily major_freeze_launcher stopped", K_(tenant_id));
     }
-    LOG_INFO("daily major_freeze_launcher stopped", K_(tenant_id));
   }
+}
+
+void ObDailyMajorFreezeLauncher::stop()
+{
+  if (!stop_) {
+    stop_ = true;
+    TG_STOP(lib::TGDefIDs::MFLaunchTimer);
+  }
+}
+
+void ObDailyMajorFreezeLauncher::wait()
+{
+  if (is_inited_) {
+    TG_WAIT(lib::TGDefIDs::MFLaunchTimer);
+  }
+}
+
+int ObDailyMajorFreezeLauncher::destroy()
+{
+  int ret = OB_SUCCESS;
+  stop();
+  wait();
+  TG_DESTROY(lib::TGDefIDs::MFLaunchTimer);
+  stop_ = true;
+  is_paused_ = false;
+  is_inited_ = false;
+  sql_proxy_ = nullptr;
+  config_ = nullptr;
+  merge_info_mgr_ = nullptr;
+  tablet_ckm_gc_compaction_scn_.set_invalid();
+  return ret;
 }
 
 int ObDailyMajorFreezeLauncher::try_launch_major_freeze()
@@ -118,7 +154,7 @@ int ObDailyMajorFreezeLauncher::try_launch_major_freeze()
   int ret = OB_SUCCESS;
 
   omt::ObTenantConfigGuard tenant_config(TENANT_CONF(tenant_id_));
-  if (IS_NOT_INIT) {
+  if (!is_inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("not init", KR(ret));
   } else if (OB_UNLIKELY(!tenant_config.is_valid())) {
@@ -171,7 +207,6 @@ int ObDailyMajorFreezeLauncher::try_launch_major_freeze()
             LOG_WARN("leader switch or ddl confilict, will try to launch major freeze again",
               KR(ret), K(param), "sleep_us", MAJOR_FREEZE_RETRY_INTERVAL_US * MAJOR_FREEZE_RETRY_LIMIT);
             int64_t usleep_cnt = 0;
-            update_last_run_timestamp();
             while (!stop_ && (usleep_cnt < MAJOR_FREEZE_RETRY_LIMIT)) {
               ++usleep_cnt;
               ob_usleep(MAJOR_FREEZE_RETRY_INTERVAL_US);
@@ -197,7 +232,7 @@ int ObDailyMajorFreezeLauncher::try_gc_freeze_info()
 {
   int ret = OB_SUCCESS;
   int64_t now = ObTimeUtility::current_time();
-  if (IS_NOT_INIT) {
+  if (!is_inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("not init", KR(ret));
   } else if ((now - gc_freeze_info_last_timestamp_) < MODIFY_GC_INTERVAL) {
@@ -220,7 +255,7 @@ int ObDailyMajorFreezeLauncher::try_gc_tablet_checksum()
   SCN min_keep_compaction_scn;
   int64_t now = ObTimeUtility::current_time();
   const static int64_t BATCH_DELETE_CNT = 2000;
-  if (OB_UNLIKELY(IS_NOT_INIT || OB_ISNULL(sql_proxy_) || OB_ISNULL(merge_info_mgr_))) {
+  if (OB_UNLIKELY(!is_inited_ || OB_ISNULL(sql_proxy_) || OB_ISNULL(merge_info_mgr_))) {
     ret = OB_NOT_INIT;
     LOG_WARN("not init", KR(ret), K_(is_inited), KP(sql_proxy_), KP(merge_info_mgr_));
   } else {
@@ -267,15 +302,6 @@ int ObDailyMajorFreezeLauncher::try_gc_tablet_checksum()
     }
   }
   return ret;
-}
-
-int64_t ObDailyMajorFreezeLauncher::get_schedule_interval() const
-{
-  int64_t schedule_interval = MAJOR_FREEZE_RETRY_INTERVAL_US * MAJOR_FREEZE_RETRY_LIMIT;
-  if (OB_UNLIKELY(LAUNCHER_INTERVAL_US > MAJOR_FREEZE_RETRY_INTERVAL_US * MAJOR_FREEZE_RETRY_LIMIT)) {
-    schedule_interval = LAUNCHER_INTERVAL_US;
-  }
-  return schedule_interval;
 }
 
 }//end namespace rootserver

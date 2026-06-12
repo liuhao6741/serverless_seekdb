@@ -36,10 +36,6 @@ namespace palf
 {
 namespace election
 {
-int EventRecorder::report_event_(ElectionEventType, const common::ObString &)
-{
-  return OB_SUCCESS;
-}
 }
 }
 namespace unittest {

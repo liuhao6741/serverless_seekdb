@@ -72,28 +72,26 @@ bool ObRecycleSchemaValue::is_valid() const
   return max_schema_version_ > 0 && record_cnt_ > 0;
 }
 
-int64_t ObSchemaHistoryRecyclerIdling::get_idle_interval_us()
+int64_t ObSchemaHistoryRecycler::get_recycle_interval_us() const
 {
-  int64_t idle_time = DEFAULT_SCHEMA_HISTORY_RECYCLE_INTERVAL;
+  int64_t recycle_interval = 60LL * 60 * 1000 * 1000; // 1h
   if (0 != GCONF.schema_history_recycle_interval
       && !GCONF.in_upgrade_mode()) {
-    idle_time = GCONF.schema_history_recycle_interval;
+    recycle_interval = GCONF.schema_history_recycle_interval;
   }
-  return idle_time;
+  return recycle_interval;
 }
 
 ObSchemaHistoryRecycler::ObSchemaHistoryRecycler()
-  : inited_(false), idling_(stop_), schema_service_(NULL),
-    /*freeze_info_mgr_(NULL),*/ sql_proxy_(NULL), recycle_schema_versions_()
+  : inited_(false), stop_(false), schema_service_(NULL),
+    /*freeze_info_mgr_(NULL),*/ sql_proxy_(NULL), recycle_schema_versions_(),
+    last_recycle_ts_(0)
 {
 }
 
 ObSchemaHistoryRecycler::~ObSchemaHistoryRecycler()
 {
-  if (!stop_) {
-    stop();
-    wait();
-  }
+  (void)destroy();
 }
 
 int ObSchemaHistoryRecycler::init(
@@ -102,43 +100,55 @@ int ObSchemaHistoryRecycler::init(
     ObMySQLProxy &sql_proxy)
 {
   int ret = OB_SUCCESS;
-  const int schema_history_recycler_thread_cnt = 1;
   if (inited_) {
     ret = OB_INIT_TWICE;
     LOG_WARN("init twice", KR(ret));
-  } else if (OB_FAIL(create(schema_history_recycler_thread_cnt, "SchemaRec"))) {
-    LOG_WARN("create thread failed", KR(ret), K(schema_history_recycler_thread_cnt));
   } else if (OB_FAIL(recycle_schema_versions_.create(hash::cal_next_prime(BUCKET_NUM),
                      "RecScheHisMap", "RecScheHisMap"))) {
     LOG_WARN("fail to init hashmap", KR(ret));
+  } else if (OB_FAIL(TG_START(lib::TGDefIDs::SchemaRecTimer))) {
+    LOG_WARN("start schema recycler timer failed", KR(ret));
+  } else if (OB_FAIL(TG_SCHEDULE(lib::TGDefIDs::SchemaRecTimer, *this, 1 * 1000 * 1000L, true/*is_repeat*/))) {
+    LOG_WARN("schedule schema recycler timer failed", KR(ret));
   } else {
     schema_service_ = &schema_service;
     //freeze_info_mgr_ = &freeze_info_manager;
     sql_proxy_ = &sql_proxy;
+    stop_ = false;
+    last_recycle_ts_ = 0;
     inited_ = true;
   }
   return ret;
 }
 
-int ObSchemaHistoryRecycler::idle()
+int ObSchemaHistoryRecycler::start()
+{
+  // Timer TG is created and scheduled in init(); RS restart path still calls start() for API parity.
+  return OB_SUCCESS;
+}
+
+int ObSchemaHistoryRecycler::destroy()
 {
   int ret = OB_SUCCESS;
   if (!inited_) {
-    ret = OB_NOT_INIT;
-    LOG_WARN("not init", K(ret));
-  } else if (OB_FAIL(idling_.idle())) {
-    LOG_WARN("idle failed", K(ret));
+    // already torn down or init never completed
+  } else {
+    if (!stop_) {
+      stop();
+    }
+    wait();
+    TG_DESTROY(lib::TGDefIDs::SchemaRecTimer);
+    int tmp_ret = recycle_schema_versions_.destroy();
+    if (OB_SUCCESS != tmp_ret) {
+      LOG_WARN("recycle_schema_versions destroy failed", KR(tmp_ret));
+      ret = tmp_ret;
+    }
+    schema_service_ = nullptr;
+    sql_proxy_ = nullptr;
+    inited_ = false;
+    stop_ = true;
   }
   return ret;
-}
-
-void ObSchemaHistoryRecycler::wakeup()
-{
-  if (!inited_) {
-    LOG_WARN_RET(common::OB_NOT_INIT, "not init");
-  } else {
-    idling_.wakeup();
-  }
 }
 
 void ObSchemaHistoryRecycler::stop()
@@ -148,8 +158,15 @@ void ObSchemaHistoryRecycler::stop()
     ret = OB_NOT_INIT;
     LOG_WARN("not init", K(ret));
   } else {
-    ObRsReentrantThread::stop();
-    idling_.wakeup();
+    stop_ = true;
+    TG_STOP(lib::TGDefIDs::SchemaRecTimer);
+  }
+}
+
+void ObSchemaHistoryRecycler::wait()
+{
+  if (inited_) {
+    TG_WAIT(lib::TGDefIDs::SchemaRecTimer);
   }
 }
 
@@ -179,29 +196,29 @@ int ObSchemaHistoryRecycler::check_stop()
   return ret;
 }
 
-void ObSchemaHistoryRecycler::run3()
+void ObSchemaHistoryRecycler::runTimerTask()
 {
-  LOG_INFO("[SCHEMA_RECYCLE] schema history recycler start");
   int ret = OB_SUCCESS;
   if (!inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("not inited", KR(ret));
-  } else if (OB_FAIL(recycle_schema_versions_.clear())) {
-    LOG_WARN("fail to clear recycle schema version map", KR(ret));
   } else {
-    while (!stop_) {
-      ObCurTraceId::init(GCTX.self_addr());
-      LOG_INFO("[SCHEMA_RECYCLE] recycle schema history start");
-      if (OB_FAIL(try_recycle_schema_history())) {
-        LOG_WARN("fail to recycle schema history", KR(ret));
+    const int64_t interval = get_recycle_interval_us();
+    const int64_t now = ObTimeUtility::current_time();
+    if (last_recycle_ts_ + interval <= now) {
+      last_recycle_ts_ = now;
+      if (OB_FAIL(recycle_schema_versions_.clear())) {
+        LOG_WARN("fail to clear recycle schema version map", KR(ret));
+      } else {
+        ObCurTraceId::init(GCTX.self_addr());
+        LOG_INFO("[SCHEMA_RECYCLE] recycle schema history start");
+        if (OB_FAIL(try_recycle_schema_history())) {
+          LOG_WARN("fail to recycle schema history", KR(ret));
+        }
+        LOG_INFO("[SCHEMA_RECYCLE] recycle schema history finish", KR(ret));
       }
-      LOG_INFO("[SCHEMA_RECYCLE] recycle schema history finish", KR(ret));
-      // retry until stopped, reset ret to OB_SUCCESS
-      ret = OB_SUCCESS;
-      idle();
     }
   }
-  LOG_INFO("[SCHEMA_RECYCLE] schema history recycler quit");
   return;
 }
 

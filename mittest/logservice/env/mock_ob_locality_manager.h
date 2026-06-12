@@ -14,7 +14,6 @@
  * limitations under the License.
  */
  
-#include "storage/ob_locality_manager.h"
 #include "lib/hash/ob_hashmap.h"                // ObHashMap
 #include "logservice/palf/palf_callback.h"
 
@@ -42,11 +41,11 @@ class CallBack
     common::ObRegion v_;
 };
 
-class MockObLocalityManager : public palf::PalfLocalityInfoCb, public ObLocalityManager
+class MockObLocalityManager : public palf::PalfLocalityInfoCb
 {
 public:
   MockObLocalityManager(): is_inited_(false) { }
-  ~MockObLocalityManager() { destroy(); }
+  virtual ~MockObLocalityManager() { destroy(); }
   int init(LogMemberRegionMap *region_map)
   {
     int ret = OB_SUCCESS;

@@ -560,12 +560,8 @@ int ObRebuildIndexTask::purge_old_mlog(const ObDDLTaskStatus new_status)
     ObSEArray<uint64_t, 4> relevent_mv_tables;
     const uint64_t base_table_id = new_mlog_schema->get_data_table_id();
     const ObTableSchema *base_table_schema = nullptr;
-    common::ObCommonSqlProxy *mview_pl_proxy = nullptr;
-    if (oracle_mode) {
-      mview_pl_proxy = &root_service_->get_oracle_sql_proxy();
-    } else {
-      mview_pl_proxy = GCTX.sql_proxy_;
-    }
+    common::ObCommonSqlProxy *mview_pl_proxy = GCTX.sql_proxy_;
+
     // 1. get all of relevant mviews of the base table
     // 2. invoke fast refresh for the mviews which have fast-refresh or on-query-computation flags
     // 3. invoke purge for the old mlog

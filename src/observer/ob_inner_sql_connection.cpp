@@ -2366,7 +2366,6 @@ int ObInnerSQLConnection::create_session_by_mgr()
   } else if (OB_FAIL(GCTX.session_mgr_->create_session(tenant_id, sid, proxy_sid,
                                                       ObTimeUtility::current_time(),
                                                       inner_session_))) {
-    GCTX.session_mgr_->mark_sessid_unused(sid);
     inner_session_ = NULL;
     LOG_WARN("create session failed", K(ret), K(sid));
   } else {
@@ -2434,7 +2433,6 @@ int ObInnerSQLConnection::destroy_inner_session()
         } else {
           GCTX.session_mgr_->revert_session(inner_session_);
           GCTX.session_mgr_->free_session(free_session_ctx_);
-          GCTX.session_mgr_->mark_sessid_unused(free_session_ctx_.sessid_);
         }
       } else {
         ret = OB_ERR_UNEXPECTED;

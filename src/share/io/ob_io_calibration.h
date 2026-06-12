@@ -137,8 +137,6 @@ public:
   int reset_io_ability();
   int get_io_ability(ObIOAbility &io_ability);
   void get_iops_scale(const ObIOMode mode, const int64_t size, double &iops_scale, bool &is_io_ability_valid);
-  int read_from_table();
-  int write_into_table(ObMySQLTransaction &trans, const ObAddr &addr, const ObIOAbility &io_ability);
   int refresh(const bool only_refresh, const ObIArray<ObIOBenchResult> &items);
   int execute_benchmark();
   int get_benchmark_status(int64_t &start_ts, int64_t &finish_ts, int &ret_code);

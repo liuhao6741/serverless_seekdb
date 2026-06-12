@@ -227,7 +227,6 @@ int ObDBMSSchedJobExecutor::create_session(
   } else if (OB_FAIL(GCTX.session_mgr_->create_session(
                 tenant_id, sid, proxy_sid, ObTimeUtility::current_time(), session_info))) {
     LOG_WARN("create session failed", K(ret), K(sid));
-    GCTX.session_mgr_->mark_sessid_unused(sid);
     session_info = NULL;
   } else if (OB_ISNULL(session_info)) {
     ret = OB_ERR_UNEXPECTED;
@@ -254,7 +253,6 @@ int ObDBMSSchedJobExecutor::destroy_session(
     session_info->set_session_sleep();
     GCTX.session_mgr_->revert_session(session_info);
     GCTX.session_mgr_->free_session(free_session_ctx);
-    GCTX.session_mgr_->mark_sessid_unused(free_session_ctx.sessid_);
   }
   return ret;
 }

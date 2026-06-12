@@ -683,7 +683,6 @@ ob_set_subtarget(ob_storage common
   ob_i_store.cpp
   ob_i_table.cpp
   ob_i_tablet_memtable.cpp
-  ob_locality_manager.cpp
   ob_partition_range_spliter.cpp
   ob_query_iterator_factory.cpp
   ob_relative_table.cpp

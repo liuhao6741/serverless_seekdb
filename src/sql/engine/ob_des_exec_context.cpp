@@ -52,7 +52,6 @@ void ObDesExecContext::cleanup_session()
       GCTX.session_mgr_->revert_session(my_session_);
       GCTX.session_mgr_->free_session(free_session_ctx_);
       my_session_ = NULL;
-      GCTX.session_mgr_->mark_sessid_unused(free_session_ctx_.sessid_);
     }
   }
   OB_ASSERT(ObQueryRetryAshGuard::get_info_ptr() == nullptr);
@@ -91,7 +90,6 @@ int ObDesExecContext::create_my_session(uint64_t tenant_id)
                                                     ObTimeUtility::current_time(),
                                                     my_session_))) {
       LOG_WARN("create session failed", K(ret), K(sid));
-      GCTX.session_mgr_->mark_sessid_unused(sid);
       my_session_ = NULL;
     } else {
       free_session_ctx_.sessid_ = sid;
@@ -109,8 +107,7 @@ int ObDesExecContext::create_my_session(uint64_t tenant_id)
         local_session = new (local_session) ObSQLSessionInfo();
         uint32_t tmp_sid = 0;
         uint64_t tmp_proxy_sessid = proxy_sid;
-        bool session_in_mgr = false;
-        if (OB_FAIL(GCTX.session_mgr_->create_sessid(tmp_sid, session_in_mgr))) {
+        if (OB_FAIL(GCTX.session_mgr_->create_sessid(tmp_sid))) {
           LOG_WARN("failed to mock session id", K(ret));
         } else if (OB_FAIL(local_session->init(tmp_sid, tmp_proxy_sessid, NULL))) {
           LOG_WARN("my session init failed", K(ret));

@@ -73,9 +73,16 @@ public:
   {
     run_wrapper_ = run_wrapper;
   }
+  static void set_default_run_wrapper(IRunWrapper *run_wrapper);
+  static IRunWrapper *get_default_run_wrapper();
   IRunWrapper * get_run_wrapper()
   {
     return run_wrapper_;
+  }
+  IRunWrapper *get_effective_run_wrapper()
+  {
+    IRunWrapper *run_wrapper = run_wrapper_;
+    return OB_NOT_NULL(run_wrapper) ? run_wrapper : get_default_run_wrapper();
   }
 
 

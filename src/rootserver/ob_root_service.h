@@ -80,11 +80,6 @@ namespace obrpc
 {
 class ObSrvRpcProxy;
 class ObCommonRpcProxy;
-struct ObGetSwitchoverStatusRes;
-}
-namespace storage
-{
-class ObMajorFreeze;
 }
 
 namespace rootserver
@@ -114,117 +109,29 @@ class ObRootService
 {
 public:
   friend class TestRootServiceCreateTable_check_rs_capacity_Test;
-  friend class ObTenantWrsTask;
-  class ObStartStopServerTask : public share::ObAsyncTask
-  {
-  public:
-    ObStartStopServerTask(ObRootService &root_service,
-                          const common::ObAddr &server,
-                          const bool start)
-      : root_service_(root_service), server_(server), start_(start) {}
-    virtual ~ObStartStopServerTask() {}
-    virtual int process();
-    virtual int64_t get_deep_copy_size() const;
-    share::ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const;
-  private:
-    ObRootService &root_service_;
-    const common::ObAddr server_;
-    const bool start_;
-  };
 
-  class ObRestartTask : public common::ObAsyncTimerTask
+  class ObRestartTask : public common::ObTimerTask
   {
   public:
     explicit ObRestartTask(ObRootService &root_service);
     virtual ~ObRestartTask();
-
-    // interface of AsyncTask
-    virtual int process() override;
-    virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-    virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
+    virtual void runTimerTask() override;
   private:
     ObRootService &root_service_;
   private:
     DISALLOW_COPY_AND_ASSIGN(ObRestartTask);
   };
 
-  class ObLoadDDLTask : public common::ObAsyncTimerTask
+  class ObLoadDDLTask : public common::ObTimerTask
   {
   public:
     explicit ObLoadDDLTask(ObRootService &root_service);
     virtual ~ObLoadDDLTask() = default;
-    virtual int process() override;
-    virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-    virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
+    virtual void runTimerTask() override;
   private:
     ObRootService &root_service_;
   };
 
-  class ObRefreshIOCalibrationTask : public common::ObAsyncTimerTask
-  {
-  public:
-    explicit ObRefreshIOCalibrationTask(ObRootService &root_service);
-    virtual ~ObRefreshIOCalibrationTask() = default;
-    virtual int process() override;
-    virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-    virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
-  private:
-    ObRootService &root_service_;
-  };
-
-  class ObZoneStorageOperationTask : public common::ObAsyncTimerTask
-  {
-  public:
-    explicit ObZoneStorageOperationTask(ObRootService &root_service);
-    virtual ~ObZoneStorageOperationTask() = default;
-    virtual int process() override;
-    virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-    virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
-  private:
-    ObRootService &root_service_;
-  };
-
-  class ObMinorFreezeTask : public share::ObAsyncTask
-  {
-  public:
-    explicit ObMinorFreezeTask(const obrpc::ObRootMinorFreezeArg &arg) : arg_(arg) {}
-    virtual ~ObMinorFreezeTask() {}
-    virtual int process();
-    virtual int64_t get_deep_copy_size() const;
-    share::ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const;
-  private:
-    obrpc::ObRootMinorFreezeArg arg_;
-  };
-  class ObTenantGlobalContextCleanTimerTask : private common::ObTimerTask
-  {
-  public:
-    explicit ObTenantGlobalContextCleanTimerTask(ObRootService &root_service);
-    virtual ~ObTenantGlobalContextCleanTimerTask() {};
-    int schedule(int tg_id);
-  private:
-    void runTimerTask() override;
-  private:
-    static constexpr int64_t SCHEDULE_PERIOD = 3600LL * 1000 * 1000; // 1h
-    ObRootService &root_service_;
-  };
-
-  class ObAlterLogExternalTableTask : public common::ObAsyncTimerTask
-  {
-  public:
-    ObAlterLogExternalTableTask(ObRootService &root_service);
-    virtual ~ObAlterLogExternalTableTask() {}
-    int init(const uint64_t &data_version);
-  public:
-    virtual int process() override;
-    virtual int64_t get_deep_copy_size() const override { return sizeof(*this); }
-    virtual ObAsyncTask *deep_copy(char *buf, const int64_t buf_size) const override;
-  private:
-    int alter_log_external_table_();
-  private:
-    ObRootService &root_service_;
-    uint64_t pre_data_version_;
-    DISALLOW_COPY_AND_ASSIGN(ObAlterLogExternalTableTask);
-  };
 
 public:
   ObRootService();
@@ -257,16 +164,13 @@ public:
   share::status::ObRootServiceStatus get_status() const;
   bool in_debug() const { return debug_; }
   void set_debug() { debug_ = true; }
-  int reload_config();  
+  int reload_config();
   virtual bool check_config(const ObConfigItem &item, const char *&err_info);
   // misc get functions
   share::schema::ObMultiVersionSchemaService &get_schema_service() { return *schema_service_; }
   common::ObMySQLProxy &get_sql_proxy() { return sql_proxy_; }
-  common::ObOracleSqlProxy &get_oracle_sql_proxy() { return oracle_sql_proxy_; }
   obrpc::ObCommonRpcProxy &get_common_rpc_proxy() { return common_proxy_; }
   obrpc::ObSrvRpcProxy &get_rpc_proxy() { return rpc_proxy_; }
-  common::ObWorkQueue &get_task_queue() { return task_queue_; }
-  common::ObWorkQueue &get_inspect_task_queue() { return inspect_task_queue_; }
   common::ObServerConfig *get_server_config() { return config_; }
   int64_t get_core_meta_table_version() { return core_meta_table_version_; }
   ObSchemaHistoryRecycler &get_schema_history_recycler() { return schema_history_recycler_; }
@@ -498,8 +402,6 @@ public:
   int check_weak_read_version_refresh_interval(int64_t refresh_interval, bool &valid);
   // may modify arg before taking effect
   int set_config_pre_hook(obrpc::ObAdminSetConfigArg &arg);
-  // arg is readonly after take effect
-  int set_config_post_hook(const obrpc::ObAdminSetConfigArg &arg);
 
   // @see ObRestartTask
   int after_restart();
@@ -515,8 +417,6 @@ public:
   int update_stat_cache(const obrpc::ObUpdateStatCacheArg &arg);
 
   int schedule_load_ddl_task();
-  int schedule_refresh_io_calibration_task();
-  int schedule_alter_log_external_table_task();
   // ob_admin command, must be called in ddl thread
   int force_create_sys_table(const obrpc::ObForceCreateSysTableArg &arg);
   int broadcast_schema(const obrpc::ObBroadcastSchemaArg &arg);
@@ -645,17 +545,18 @@ private:
   // avoid concurrent run of do_restart and bootstrap
   common::ObLatch bootstrap_lock_;
 
-  // the single task queue for all async tasks and timer tasks
-  common::ObWorkQueue task_queue_;
-  common::ObWorkQueue inspect_task_queue_;
+  // timer tg for rootservice periodic tasks
+  int restart_task_tg_id_;
+  int load_ddl_task_tg_id_;
+  int event_table_clear_task_tg_id_;
+  int purge_recyclebin_task_tg_id_;
 
   // async timer tasks
-  ObRestartTask restart_task_;  // not repeat & no retry
-  ObLoadDDLTask load_ddl_task_; // repeat to succeed & no retry
-  ObRefreshIOCalibrationTask refresh_io_calibration_task_; // retry to succeed & no repeat
+  ObRestartTask restart_task_;  // repeat on failure and cancel on success
+  ObLoadDDLTask load_ddl_task_; // repeat on failure and cancel on success
   share::ObEventTableClearTask event_table_clear_task_;  // repeat & no retry
 
-  ObPurgeRecyclebinTask purge_recyclebin_task_;     // not repeat & no retry
+  ObPurgeRecyclebinTask purge_recyclebin_task_;     // periodic schedule
   // for set_config
   ObLatch set_config_lock_;
 
@@ -668,8 +569,6 @@ private:
 
   int64_t fail_count_;
   ObSchemaHistoryRecycler schema_history_recycler_;
-  // application context
-  ObAlterLogExternalTableTask alter_log_external_table_task_; // repeat to succeed & no retry
   //rebuild tablet
 
   // max id cache for object_id and tablet_id

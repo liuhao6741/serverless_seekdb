@@ -260,8 +260,6 @@ int PalfEnvImpl::init(
     PALF_LOG(ERROR, "palf_handle_impl_map_ init failed", K(ret));
   } else if (OB_FAIL(log_loop_thread_.init(this))) {
     PALF_LOG(ERROR, "log_loop_thread_ init failed", K(ret));
-  } else if (OB_FAIL(election::GLOBAL_INIT_ELECTION_MODULE())) {
-    PALF_LOG(ERROR, "global init election module failed", K(ret));
   } else if (OB_FAIL(disk_options_wrapper_.init(options.disk_options_))) {
     PALF_LOG(ERROR, "disk_options_wrapper_ init failed", K(ret));
   } else if (OB_FAIL(log_updater_.init(this))) {

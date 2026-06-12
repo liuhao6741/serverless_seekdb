@@ -361,7 +361,6 @@ std::shared_ptr<ObLiteEmbedConn> ObLiteEmbed::connect(const char* db_name, const
   } else if (OB_FAIL(GCTX.session_mgr_->create_sessid(sid))) {
     LOG_WARN("Failed to create sess id", KR(ret));
   } else if (OB_FAIL(GCTX.session_mgr_->create_session(OB_SYS_TENANT_ID, sid, 0, ObTimeUtility::current_time(), session))) {
-    GCTX.session_mgr_->mark_sessid_unused(sid);
     session = nullptr;
     LOG_WARN("Failed to create session", KR(ret), K(sid));
   } else if (FALSE_IT(common::ob_setup_tsi_warning_buffer(&session->get_warnings_buffer()))) {
@@ -443,7 +442,6 @@ void ObLiteEmbedConn::reset()
   }
   if (OB_NOT_NULL(session_)) {
     GCTX.session_mgr_->revert_session(session_);
-    GCTX.session_mgr_->mark_sessid_unused(session_->get_sid());
     session_ = nullptr;
   }
 }

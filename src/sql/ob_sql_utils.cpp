@@ -25,7 +25,6 @@
 #include "sql/rewrite/ob_transform_utils.h"
 #include "observer/omt/ob_tenant_timezone_mgr.h"
 #include "share/schema/ob_schema_printer.h"
-#include "storage/ob_locality_manager.h"
 #include "sql/engine/expr/ob_expr_lob_utils.h"
 #include <openssl/md5.h>
 #include "share/resource_manager/ob_resource_manager.h"

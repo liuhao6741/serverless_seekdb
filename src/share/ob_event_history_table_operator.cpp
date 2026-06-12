@@ -32,17 +32,13 @@ using namespace common;
 ObEventTableClearTask::ObEventTableClearTask(
     ObEventHistoryTableOperator &rs_event_operator,
     ObEventHistoryTableOperator &server_event_operator,
-    ObEventHistoryTableOperator &deadlock_history_operator,
-    common::ObWorkQueue &work_queue)
-    : ObAsyncTimerTask(work_queue),
-      rs_event_operator_(rs_event_operator),
+    ObEventHistoryTableOperator &deadlock_history_operator)
+    : rs_event_operator_(rs_event_operator),
       server_event_operator_(server_event_operator),
       deadlock_history_operator_(deadlock_history_operator)
-{
-  set_retry_times(0);  // don't retry when process failed
-}
+{}
 
-int ObEventTableClearTask::process()
+void ObEventTableClearTask::runTimerTask()
 {
   int ret = OB_SUCCESS;
   int tmp_ret = OB_SUCCESS;
@@ -66,21 +62,6 @@ int ObEventTableClearTask::process()
       LOG_WARN("async_delete failed", KR(tmp_ret));
     }
   }
-  return ret;
-}
-
-ObAsyncTask *ObEventTableClearTask::deep_copy(char *buf, const int64_t buf_size) const
-{
-  ObEventTableClearTask *task = NULL;
-  if (NULL == buf || buf_size < static_cast<int64_t>(sizeof(*this))) {
-    LOG_WARN_RET(OB_BUF_NOT_ENOUGH, "buffer not large enough", K(buf_size));
-  } else {
-    task = new(buf) ObEventTableClearTask(rs_event_operator_,
-                                          server_event_operator_,
-                                          deadlock_history_operator_,
-                                          work_queue_);
-  }
-  return task;
 }
 
 ////////////////////////////////////////////////////////////////

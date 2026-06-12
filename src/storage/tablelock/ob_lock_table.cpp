@@ -17,7 +17,6 @@
 #define USING_LOG_PREFIX TABLELOCK
 
 #include "ob_lock_table.h"
-#include "storage/tablelock/ob_table_lock_service.h"
 
 #include "storage/ls/ob_ls.h"                  // ObLS
 #include "storage/tablelock/ob_table_lock_iterator.h"
@@ -34,6 +33,14 @@ namespace transaction
 {
 namespace tablelock
 {
+
+void ObLockTable::CheckObjLockTask::runTimerTask()
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(lock_table_.check_and_clear_obj_lock(true /* force_compact */))) {
+    LOG_WARN("check and clear obj lock failed", K(ret));
+  }
+}
 
 int ObLockTable::restore_lock_table_(ObITable &sstable)
 {
@@ -231,6 +238,8 @@ int ObLockTable::init(ObLS *parent)
   } else if (OB_ISNULL(lock_mt_mgr_ = static_cast<ObLockMemtableMgr*>(memtable_mgr_handle.get_memtable_mgr()))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("lock memtable mgr pointer", KR(ret), KPC(parent_));
+  } else if (OB_FAIL(TG_START(lib::TGDefIDs::TableLockService))) {
+    LOG_WARN("fail to start timer for checking obj lock", K(ret));
   } else {
     parent_ = parent;
     is_inited_ = true;
@@ -248,6 +257,8 @@ int ObLockTable::prepare_for_safe_destroy()
 
 void ObLockTable::destroy()
 {
+  TG_CANCEL_TASK(lib::TGDefIDs::TableLockService, check_obj_lock_task_);
+  TG_WAIT_TASK(lib::TGDefIDs::TableLockService, check_obj_lock_task_);
   parent_ = nullptr;
   lock_mt_mgr_ = nullptr;
   lock_memtable_handle_.reset();
@@ -812,24 +823,19 @@ int ObLockTable::switch_to_leader()
 {
   int ret = OB_SUCCESS;
   common::ObTimeGuard timeguard("switch_to_leader", 10 * 1000);
-  ObTableLockService::ObOBJLockGarbageCollector *obj_lock_gc = nullptr;
   if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;
     LOG_WARN("ObLockTable is not inited", K(ret));
-  } else if (OB_FAIL(MTL(ObTableLockService *)
-                         ->get_obj_lock_garbage_collector(obj_lock_gc))) {
-    LOG_WARN("can not get ObOBJLockGarbageCollector", K(ret));
-  } else if (OB_ISNULL(obj_lock_gc)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("ObOBJLockGarbageCollector is null", K(ret));
   } else {
     timeguard.click();
     if (OB_NOT_NULL(parent_)) {
       LOG_INFO("start to check and clear obj lock when switch to leader", K(ret),
               K(parent_->get_ls_id()));
     }
-    ret = obj_lock_gc->obj_lock_gc_thread_pool_.commit_task_ignore_ret(
-        [this]() { return check_and_clear_obj_lock(true); });
+    if (OB_FAIL(TG_SCHEDULE(lib::TGDefIDs::TableLockService, check_obj_lock_task_,
+                            0 /* delay */, false /* repeat */))) {
+      LOG_WARN("schedule check and clear obj lock task failed", K(ret), KPC(parent_));
+    }
   }
   timeguard.click();
 

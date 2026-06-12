@@ -34,13 +34,8 @@ int ObKillExecutor::execute(ObExecContext &ctx, ObKillStmt &stmt)
   if (OB_FAIL(arg.init(ctx, stmt))) {
     LOG_WARN("fail to init kill_session arg", K(ret), K(arg), K(ctx), K(stmt));
   } else {
-    uint32_t SERVER_SESSID_TAG = 1ULL << 31;
-    bool is_client_id_support = false;
-    if (OB_NOT_NULL(ctx.get_my_session())) {
-      is_client_id_support = ctx.get_my_session()->is_client_sessid_support();
-    }
-    bool direct_mode = !is_client_id_support ||
-        ((arg.sess_id_ & SERVER_SESSID_TAG) >> 31);
+    // In seekdb single-node mode, always treat as direct mode
+    bool direct_mode = true;
     // Direct connection scenario kill session or kill query
     if (direct_mode) {
       if (OB_FAIL(kill_session(arg, session_mgr))) {

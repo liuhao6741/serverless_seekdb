@@ -22,9 +22,7 @@
 
 #include "share/ob_rpc_share.h"
 #include "observer/net/ob_rpc_reverse_keepalive.h"
-#include "storage/ob_locality_manager.h"
 #include "rpc/obrpc/ob_local_procedure_call.h"
-#include "storage/ob_locality_manager.h"
 
 using namespace oceanbase::rpc::frame;
 using namespace oceanbase::common;
@@ -139,7 +137,7 @@ void ObSrvNetworkFrame::destroy()
   }
 }
 
-int ObSrvNetworkFrame::start()
+int ObSrvNetworkFrame::start(bool disable_tcp)
 {
   int ret = OB_SUCCESS;
   obmysql::global_sql_nio_server =
@@ -167,7 +165,7 @@ int ObSrvNetworkFrame::start()
     }
     if (OB_FAIL(obmysql::global_sql_nio_server->start(
             GCONF.mysql_port, &deliver_, sql_net_thread_count,
-            GCONF._enable_numa_aware))) {
+            GCONF._enable_numa_aware, disable_tcp))) {
       LOG_ERROR("sql nio server start failed", K(ret));
     }
   }
@@ -340,8 +338,6 @@ int ObSrvNetworkFrame::reload_ssl_config()
 {
   int ret = common::OB_SUCCESS;
   if (GCONF.ssl_client_authentication) {
-    ObString invited_nodes(GCONF._ob_ssl_invited_nodes.str());
-
     ObString ssl_config(GCONF.ssl_external_kms_info.str());
     bool file_exist = false;
     const char *intl_file[3] = {OB_SSL_CA_FILE, OB_SSL_CERT_FILE, OB_SSL_KEY_FILE};
@@ -355,10 +351,6 @@ int ObSrvNetworkFrame::reload_ssl_config()
       ret = OB_INVALID_CONFIG;
       LOG_WARN("ssl file not available", K(new_hash_value));
       LOG_USER_ERROR(OB_INVALID_CONFIG, "ssl file not available");
-    } else if (OB_ISNULL(gctx_.locality_manager_)) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_ERROR("locality manager should not be null", K(ret), KP(gctx_.locality_manager_));
-    } else if (FALSE_IT(gctx_.locality_manager_->set_ssl_invited_nodes(invited_nodes))) {
     } else if (last_ssl_info_hash_ == new_hash_value) {
       LOG_INFO("no need reload_ssl_config", K(new_hash_value));
     } else {

@@ -22,7 +22,6 @@
 #include "sql/executor/ob_task_spliter.h"
 #include "sql/engine/px/ob_px_sqc_handler.h"
 #include "share/schema/ob_part_mgr_util.h"
-#include "storage/ob_locality_manager.h"
 #include "rpc/obrpc/ob_net_keepalive.h"
 #include "share/external_table/ob_external_table_utils.h"
 #include "sql/engine/px/ob_dfo_scheduler.h"
@@ -1782,16 +1781,7 @@ int ObPxTreeSerializer::serialize_tree(char *buf,
   if (OB_SUCC(ret)
       && root.is_table_scan()
       && static_cast<const ObTableScanSpec&>(root).is_global_index_back()) {
-    bool is_same_zone = false;
-    if (OB_ISNULL(GCTX.locality_manager_)) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("invalid argument", K(ret), K(GCTX.locality_manager_));
-    } else if (OB_FAIL(GCTX.locality_manager_->is_same_zone(run_svr, is_same_zone))) {
-      LOG_WARN("check same zone failed", K(ret), K(run_svr));
-    } else if (!is_same_zone) {
-      ret = OB_NOT_SUPPORTED;
-      LOG_USER_ERROR(OB_NOT_SUPPORTED, "Cross-zone global index lookup during 4.0 upgrade");
-    }
+    UNUSED(run_svr);
   }
   // Terminate serialization when meet ObReceive, as this op indicates
   for (int32_t i = 0; OB_SUCC(ret) && i < child_cnt; ++i) {

@@ -183,6 +183,7 @@ void ObTimerTaskThreadPool::clear_ext_tname()
 ObTimerService::ObTimerService(uint64_t tenant_id /* = OB_SERVER_TENANT_ID */)
   : is_never_started_(true),
     is_stopped_(true),
+    is_destroyed_(false),
     tenant_id_(tenant_id),
     token_alloc_(),
     priority_task_queue_(64L, nullptr, ObMemAttr(tenant_id_, "ts_queue")),
@@ -195,6 +196,7 @@ ObTimerService::ObTimerService(uint64_t tenant_id /* = OB_SERVER_TENANT_ID */)
 
 ObTimerService::~ObTimerService()
 {
+  destroy();
   priority_task_queue_.reset();
   running_task_set_.reset();
   uncanceled_task_set_.reset();
@@ -207,6 +209,7 @@ int ObTimerService::start()
   ObMonitor<Mutex>::Lock guard(monitor_);
   if (is_stopped_) {
     is_stopped_ = false;
+    is_destroyed_ = false;
     const int64_t reserve_size = INITIAL_ELEMENT_NUM * sizeof(TaskToken *);
     if (OB_FAIL(priority_task_queue_.reserve(reserve_size))) {
       OB_LOG(WARN, "reserve priority_task_queue failed", K(reserve_size), K_(tenant_id), K(ret));
@@ -285,6 +288,12 @@ void ObTimerService::wait()
 
 void ObTimerService::destroy()
 {
+  if (is_destroyed_) {
+    return;
+  }
+  is_destroyed_ = true;
+  stop();
+  wait();
   worker_thread_pool_.destroy();
   ThreadPool::destroy();
   OB_LOG(INFO, "ObTimerService destroyed", K_(tenant_id), KP(this));

@@ -18,6 +18,7 @@
 #define OCEANBASE_STORAGE_OB_LOCK_TABLE_H_
 #include <stdint.h>
 #include "lib/lock/ob_spin_lock.h"
+#include "lib/task/ob_timer.h"
 #include "lib/worker.h"
 #include "storage/ob_i_table.h"
 #include "storage/tablelock/ob_obj_lock.h"
@@ -79,7 +80,8 @@ public:
     : is_inited_(false),
       parent_(nullptr),
       lock_mt_mgr_(nullptr),
-      lock_memtable_handle_() {}
+      lock_memtable_handle_(),
+      check_obj_lock_task_(*this) {}
   ~ObLockTable() {}
   int init(storage::ObLS *parent);
   int prepare_for_safe_destroy();
@@ -177,6 +179,17 @@ private:
   int switch_to_follower_();
 
 private:
+  class CheckObjLockTask : public common::ObTimerTask
+  {
+  public:
+    explicit CheckObjLockTask(ObLockTable &lock_table) : lock_table_(lock_table) {}
+    virtual ~CheckObjLockTask() = default;
+    void runTimerTask() override;
+  private:
+    ObLockTable &lock_table_;
+  };
+
+private:
   static const int64_t LOCKTABLE_SCHEMA_VERSION = 0;
   static const int64_t LOCKTABLE_SCHEMA_ROEKEY_CNT = 1;
   static const int64_t LOCKTABLE_SCHEMA_COLUMN_CNT = 2;
@@ -184,6 +197,7 @@ private:
   storage::ObLS *parent_;
   ObLockMemtableMgr *lock_mt_mgr_;
   storage::ObTableHandleV2 lock_memtable_handle_;
+  CheckObjLockTask check_obj_lock_task_;
   TCRWLock rw_lock_;
 };
 

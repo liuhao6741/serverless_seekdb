@@ -721,23 +721,8 @@ int inner_main(int argc, char *argv[])
       const bool initialize = opts->initialize_;
       lib::Worker worker;
       lib::Worker::set_worker_to_thread_local(&worker);
-      lib::init_create_func();
-      oceanbase::share::ob_init_create_func();
-      lib::create_func_inited_ = true;
-      lib::TGMgr::instance();
-      {
-        auto &tg_mgr = lib::TGMgr::instance();
-        int fixed = 0;
-        for (int i = 0; i < lib::TGDefIDs::END; i++) {
-          if (lib::create_funcs_[i] && !tg_mgr.tgs_[i]) {
-            tg_mgr.tgs_[i] = lib::create_funcs_[i]();
-            if (tg_mgr.tgs_[i]) fixed++;
-          }
-        }
-      }
       ObServer &observer = ObServer::get_instance();
       LOG_INFO("seekdb starts", "seekdb_version", PACKAGE_STRING);
-      ATOMIC_STORE(&palf::election::INIT_TS, palf::election::get_monotonic_ts());
       if (OB_FAIL(observer.init(*opts, log_cfg))) {
         LOG_ERROR("seekdb init fail", K(ret));
       }

@@ -198,6 +198,8 @@ ObMultiTenant::ObMultiTenant()
       cpu_dump_(false),
       has_synced_(false),
       tenant_active_(false),
+      timer_tg_id_(-1),
+      timer_stopped_(true),
       tenant_limiter_head_(NULL),
       limiter_mutex_()
 
@@ -393,12 +395,17 @@ int ObMultiTenant::start()
     LOG_WARN("not init", K(ret));
   } else if (OB_FAIL(create_virtual_tenants())) {
     LOG_ERROR("create virtual tenants failed", K(ret));
-  } else if (OB_FAIL(ObThreadPool::start())) {
-    LOG_ERROR("start multi tenant thread fail", K(ret));
+  } else if (OB_FAIL(TG_CREATE(lib::TGDefIDs::MultiTenantTimer, timer_tg_id_))) {
+    LOG_ERROR("create multi tenant timer failed", K(ret));
+  } else if (OB_FAIL(TG_START(timer_tg_id_))) {
+    LOG_ERROR("start multi tenant timer failed", K(ret), K_(timer_tg_id));
+  } else if (OB_FAIL(TG_SCHEDULE(timer_tg_id_, *this, TIME_SLICE_PERIOD, true/*is_repeat*/))) {
+    LOG_ERROR("schedule multi tenant timer failed", K(ret), K_(timer_tg_id));
   // start memstore print timer.
   } else if (OB_FAIL(printer.register_timer_task(lib::TGDefIDs::ServerGTimer))) {
     LOG_ERROR("Fail to register timer task", K(ret));
   } else {
+    timer_stopped_ = false;
     LOG_INFO("succ to start multi tenant");
   }
 
@@ -411,7 +418,10 @@ int ObMultiTenant::start()
 
 void ObMultiTenant::stop()
 {
-  ObThreadPool::stop();
+  if (!timer_stopped_ && timer_tg_id_ != -1) {
+    TG_STOP(timer_tg_id_);
+    timer_stopped_ = true;
+  }
   remove_tenant();
 }
 
@@ -422,7 +432,9 @@ void ObMultiTenant::wait()
       usleep(50 * 1000);
     }
   }
-  ObThreadPool::wait();
+  if (timer_tg_id_ != -1) {
+    TG_WAIT(timer_tg_id_);
+  }
 }
 
 
@@ -430,6 +442,10 @@ void ObMultiTenant::destroy()
 {
   if (OB_NOT_NULL(tenant_)) {
     tenant_->destroy();
+  }
+  if (timer_tg_id_ != -1) {
+    TG_DESTROY(timer_tg_id_);
+    timer_tg_id_ = -1;
   }
   is_inited_ = false;
 }
@@ -1796,45 +1812,40 @@ int ObMultiTenant::get_tenant_cpu(
   return ret;
 }
 
-void ObMultiTenant::run1()
+void ObMultiTenant::runTimerTask()
 {
-  lib::set_thread_name("MultiTenant");
-  while (!has_set_stop()) {
-    {
-      SpinRLockGuard guard(lock_);
-      bool need_regist_cgroup = false;
-      if (REACH_TIME_INTERVAL(1 * 1000 * 1000L)) {  // every 1s
-        if (OB_NOT_NULL(GCTX.cgroup_ctrl_)) {
-          need_regist_cgroup = GCTX.cgroup_ctrl_->check_cgroup_status();
-        }
-      }
-      if (OB_ISNULL(tenant_) || !tenant_active_) {
-      } else {
-        if (need_regist_cgroup) {
-          tenant_->regist_threads_to_cgroup();
-        }
-        tenant_->timeup();
+  {
+    SpinRLockGuard guard(lock_);
+    bool need_regist_cgroup = false;
+    if (REACH_TIME_INTERVAL(1 * 1000 * 1000L)) {  // every 1s
+      if (OB_NOT_NULL(GCTX.cgroup_ctrl_)) {
+        need_regist_cgroup = GCTX.cgroup_ctrl_->check_cgroup_status();
       }
     }
-    ob_usleep(TIME_SLICE_PERIOD, true/*is_idle_sleep*/);
-
-    if (ObTenantNodeBalancer::get_instance().is_inited() && REACH_TIME_INTERVAL(ObTenantNodeBalancer::get_instance().get_refresh_interval())) {
-      ObTenantNodeBalancer::get_instance().handle();
+    if (OB_ISNULL(tenant_) || !tenant_active_) {
+    } else {
+      if (need_regist_cgroup) {
+        tenant_->regist_threads_to_cgroup();
+      }
+      tenant_->timeup();
     }
+  }
 
-    if (REACH_TIME_INTERVAL(10000000L)) {  // every 10s
-      ObDIActionGuard ag("dump tenant info");
-      SpinRLockGuard guard(lock_);
-      if (!OB_ISNULL(tenant_)) {
-        ObTaskController::get().allow_next_syslog();
-        LOG_INFO("dump tenant info", "tenant", *tenant_);
-        if (OB_NOT_NULL(GCTX.cgroup_ctrl_) && GCTX.cgroup_ctrl_->is_valid()) {
-          tenant_->print_throttled_time();
-        }
+  if (ObTenantNodeBalancer::get_instance().is_inited() && REACH_TIME_INTERVAL(ObTenantNodeBalancer::get_instance().get_refresh_interval())) {
+    ObTenantNodeBalancer::get_instance().handle();
+  }
+
+  if (REACH_TIME_INTERVAL(10000000L)) {  // every 10s
+    ObDIActionGuard ag("dump tenant info");
+    SpinRLockGuard guard(lock_);
+    if (!OB_ISNULL(tenant_)) {
+      ObTaskController::get().allow_next_syslog();
+      LOG_INFO("dump tenant info", "tenant", *tenant_);
+      if (OB_NOT_NULL(GCTX.cgroup_ctrl_) && GCTX.cgroup_ctrl_->is_valid()) {
+        tenant_->print_throttled_time();
       }
     }
   }
-  LOG_INFO("OMT quit");
 }
 
 uint32_t ObMultiTenant::get_tenant_lock_bucket_idx(const uint64_t tenant_id)
