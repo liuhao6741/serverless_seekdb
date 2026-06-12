@@ -45,6 +45,9 @@
     <a href="https://www.youtube.com/@OceanBaseDB">
         <img alt="YouTube" src="https://img.shields.io/badge/YouTube-red?logo=youtube">
     </a>
+</p>
+
+<p align="center">
     <a href="https://trendshift.io/repositories/15659" target="_blank">
         <img src="https://trendshift.io/api/badge/repositories/15659" alt="oceanbase%2Fseekdb | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
     </a>
